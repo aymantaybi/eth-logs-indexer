@@ -1,0 +1,24 @@
+{
+  "devDependencies": {
+    "@types/node": "^18.7.6",
+    "typescript": "^4.7.4"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.1",
+    "express": "^4.18.1",
+    "web3": "^1.7.5"
+  },
+  "name": "ronin-events-indexer",
+  "description": "Listen to ronin emitted events and save the decoded output to mongodb instance",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "exemple": "npm run build && ts-node exemple.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
