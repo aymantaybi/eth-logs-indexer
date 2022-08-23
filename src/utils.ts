@@ -57,9 +57,16 @@ function getEventLabel(jsonInterface: EventJsonInterface) {
   return eventLabel;
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 export {
   formatFilters,
   getAddressAndTopicsOptions,
   formatDecodedLogs,
   getEventLabel,
+  sleep
 };

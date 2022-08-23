@@ -1,6 +1,7 @@
 import * as dotenv from "dotenv";
 import Web3 from "web3";
 import Indexer, { Filter } from "./src";
+import { DecodedLog } from "./src/interfaces";
 
 dotenv.config();
 
@@ -97,12 +98,12 @@ const AxieSpawnEventInterface = {
 const host = WEBSOCKET_PROVIDER_HOST!;
 
 const filters: Filter[] = [
-/*   {
+  {
     address: "0xfff9ce5f71ca6178d3beecedb61e7eff1602950e",
     jsonInterface: {
       event: OrderMatchedEventInterface,
     },
-  }, */
+  },
   {
     address: "0x32950db2a7164ae833121501c797d79e7b79d74c",
     jsonInterface: {
@@ -111,21 +112,31 @@ const filters: Filter[] = [
   },
 ];
 
-const save = ({
-  decodedLogs,
-  decodedParameters,
-}: {
-  decodedLogs: any;
-  decodedParameters: any;
-}) => {
+const save = async (logs: DecodedLog[]) => {
   //console.log(decodedLogs);
 };
 
+let currentBlockNumber = 16446435;
+
 const latestBlockNumber = {
-  load: () => 0,
-  save: () => 0,
+  load: async () => currentBlockNumber,
+  save: async (blockNumber: number) => {
+    currentBlockNumber = blockNumber;
+  },
 };
 
-const indexer = new Indexer({ host, filters, save, latestBlockNumber });
+const options = {
+  delay: 10000,
+  maxBlocks: 10,
+  confirmationBlocks: 12,
+};
 
-indexer.start();
+const indexer = new Indexer({
+  host,
+  filters,
+  save,
+  latestBlockNumber,
+  options,
+});
+
+indexer.start(currentBlockNumber);

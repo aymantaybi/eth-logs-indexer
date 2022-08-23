@@ -6,10 +6,12 @@
   "dependencies": {
     "dotenv": "^16.0.1",
     "express": "^4.18.1",
-    "web3": "^1.7.5"
+    "mongoose": "^6.5.2",
+    "web3": "^1.7.5",
+    "winston": "^3.8.1"
   },
-  "name": "ronin-events-indexer",
-  "description": "Listen to ronin emitted events and save the decoded output to mongodb instance",
+  "name": "eth-logs-indexer",
+  "description": "Pull EVM blockchain logs and save the decoded output to a local database",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {

@@ -1,2 +1,3 @@
-# ronin-events-indexer
- Listen to ronin emitted events and save the decoded output to mongodb instance
+# eth-logs-indexer
+
+Pull EVM blockchain logs and save the decoded output to a local database
