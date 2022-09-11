@@ -1,12 +1,9 @@
-import EventJsonInterface from "./EventJsonInterface";
-import FunctionJsonInterface from "./FunctionJsonInterface";
-
+import { AbiItem, AbiInput } from "web3-utils";
 
 interface Filter {
   address: string;
   jsonInterface: {
-    event: EventJsonInterface;
-    function?: FunctionJsonInterface;
+    event: AbiItem;
   };
 }
 

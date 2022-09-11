@@ -1,29 +1,26 @@
 import Web3 from "web3";
-import {
-  Filter,
-  FormattedFilter,
-  EventJsonInterface,
-  FunctionJsonInterface,
-  DecodedLog,
-} from "./interfaces";
+import { decodeLog } from "eth-logs-decoder";
+import { Filter, FormattedFilter, DecodedLog } from "./interfaces";
 import {
   formatFilters,
   getAddressAndTopicsOptions,
-  formatDecodedLogs,
-  getEventLabel,
   sleep,
+  withFields,
 } from "./utils";
-import logger from "./logger";
+import logger from "./helpers/logger";
+import { executeAsync } from "./helpers/asyncBatch";
+import { Transaction } from "web3-core";
 
 interface Constructor {
   host: string;
   filters: Filter[];
   save: (logs: DecodedLog[]) => Promise<void>;
   latestBlockNumber: LatestBlockNumber;
-  options: {
-    delay: number;
-    maxBlocks: number;
-    confirmationBlocks: number;
+  options?: {
+    delay?: number;
+    maxBlocks?: number;
+    confirmationBlocks?: number;
+    include?: { transaction?: boolean | string[] };
   };
 }
 
@@ -39,8 +36,18 @@ class Indexer {
   save: (logs: DecodedLog[]) => Promise<void>;
   latestBlockNumber: LatestBlockNumber;
   block: { from: number; to: number };
-  options: { delay: number; maxBlocks: number; confirmationBlocks: number };
-  ignoreDelay: boolean;
+  options: {
+    delay: number;
+    maxBlocks: number;
+    confirmationBlocks: number;
+    include: { transaction: boolean | string[] };
+  } = {
+    delay: 10000,
+    maxBlocks: 10,
+    confirmationBlocks: 12,
+    include: { transaction: false },
+  };
+  ignoreDelay: boolean = false;
 
   constructor({
     host,
@@ -54,12 +61,11 @@ class Indexer {
     this.filters = filters;
     this.save = save;
     this.latestBlockNumber = latestBlockNumber;
-    this.options = options;
+    this.options = { ...this.options, ...options } as any;
     this.block = {
       from: -1,
       to: -1,
     };
-    this.ignoreDelay = false;
   }
 
   async main(blockNumber?: number) {
@@ -79,9 +85,9 @@ class Indexer {
       this.block.from = (await this.latestBlockNumber.load()) + 1;
       if (this.block.to - this.block.from > this.options.maxBlocks) {
         logger.warn(
-          `Max Blocks Number Exceeded (${
+          `Max blocks number exceeded (${
             this.block.to - this.block.from
-          } Block), Iteration Delay Is Ignored`
+          } block), Iteration delay is ignored`
         );
         this.ignoreDelay = true;
         this.block.to = this.block.from + this.options.maxBlocks;
@@ -91,7 +97,7 @@ class Indexer {
     }
 
     logger.info(
-      `Processing Logs From Block ${this.block.from} To Block ${this.block.to}`
+      `Processing logs from block ${this.block.from} to block ${this.block.to}`
     );
 
     let pastLogs = await this.web3.eth.getPastLogs({
@@ -101,40 +107,57 @@ class Indexer {
       toBlock: this.block.to,
     });
 
-    let logs: DecodedLog[] = [];
+    if (pastLogs.length) {
+      let getTransaction: any = this.web3.eth.getTransaction;
 
-    for (let pastLog of pastLogs) {
-      let formattedFilter = formattedFilters.find(
-        (formattedFilter) =>
-          formattedFilter.address == pastLog.address &&
-          formattedFilter.eventSignature == pastLog.topics[0]
-      )!;
-      let jsonInterfaceInputsArray = formattedFilter.jsonInterface.event.inputs;
-      let eventLabel = getEventLabel(formattedFilter.jsonInterface.event);
-      let rawDecodedData =
-        pastLog.data == "0x"
-          ? {}
-          : this.web3.eth.abi.decodeLog(
-              jsonInterfaceInputsArray,
-              pastLog.data,
-              pastLog.topics
-            );
+      let batch: any = new this.web3.BatchRequest();
+      let logs: DecodedLog[] = [];
 
-      let decodedData = formatDecodedLogs(rawDecodedData);
+      for (let pastLog of pastLogs) {
+        let { transactionHash } = pastLog;
+        let test = (request: any) => request.params[0] == transactionHash;
+        if (batch.requests.some(test)) continue;
+        batch.add(getTransaction.request(transactionHash));
+      }
 
-      let log: DecodedLog = {
-        ...pastLog,
-        decodedData,
-        event: eventLabel,
-      };
+      let transactions: Transaction[] = await executeAsync(batch);
 
-      logs.push(log);
+      for (let pastLog of pastLogs) {
+        let formattedFilter = formattedFilters.find(
+          (formattedFilter) =>
+            formattedFilter.address == pastLog.address &&
+            formattedFilter.eventSignature == pastLog.topics[0]
+        )!;
+
+        let { transactionHash } = pastLog;
+
+        let eventJsonInterface = formattedFilter.jsonInterface.event;
+
+        let log = decodeLog(pastLog, [eventJsonInterface]);
+
+        if (this.options.include.transaction) {
+          let transaction: { [key: string]: any } = transactions.find(
+            (transaction) => transaction.hash == transactionHash
+          )!;
+
+          let fields = Array.isArray(this.options.include.transaction)
+            ? this.options.include.transaction
+            : Object.keys(transaction);
+
+          logs.push({
+            ...log,
+            transaction: withFields(transaction, fields),
+          });
+        } else {
+          logs.push(log);
+        }
+      }
+
+      await this.save(logs);
+      logger.info(`${logs.length} logs saved`);
     }
-
-    await this.save(logs);
-    logger.info(`${logs.length} Logs Saved`);
     await this.latestBlockNumber.save(this.block.to);
-    logger.info(`Last Processed Block Number (${this.block.to}) Saved`);
+    logger.info(`Last processed block number (${this.block.to}) saved`);
   }
 
   async start(blockNumber?: number) {
@@ -148,4 +171,4 @@ class Indexer {
 
 export default Indexer;
 
-export { Filter, FormattedFilter, EventJsonInterface, FunctionJsonInterface };
+export { Filter, FormattedFilter };

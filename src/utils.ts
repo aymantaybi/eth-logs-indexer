@@ -1,6 +1,6 @@
 import Utils from "web3-utils";
 import ABICoder from "web3-eth-abi";
-import { Filter, FormattedFilter, EventJsonInterface } from "./interfaces";
+import { Filter, FormattedFilter } from "./interfaces";
 
 function formatFilters(filters: Filter[]): FormattedFilter[] {
   return filters.map((filter) => {
@@ -30,43 +30,28 @@ function getAddressAndTopicsOptions(formattedFilters: FormattedFilter[]) {
   return { address, topics };
 }
 
-function formatDecodedLogs(decodedLog: any) {
-  let formatedDecodedLogs: { [key: string]: any } = {};
-  let ObjectKeys = Object.keys(decodedLog);
-  let filtredObjectKeys = ObjectKeys.filter(
-    (key: any) => isNaN(key) && key != "__length__"
-  );
-  for (let key of filtredObjectKeys) {
-    formatedDecodedLogs[key] = decodedLog[key];
-  }
-  return formatedDecodedLogs;
-}
-
-function getEventLabel(jsonInterface: EventJsonInterface) {
-  let eventLabel = `${jsonInterface.name}(`;
-
-  jsonInterface.inputs.forEach((input, index) => {
-    let inputLabel = `${input.indexed ? "indexed " : ""}${input.type} ${
-      input.name
-    }`;
-    let commaOrParenthesis =
-      index == jsonInterface.inputs.length - 1 ? " )" : ",";
-    eventLabel = `${eventLabel} ${inputLabel}${commaOrParenthesis}`;
-  });
-
-  return eventLabel;
-}
-
 function sleep(ms: number) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
 }
 
+function withFields(object: { [key: string]: any }, keys: string[]) {
+  let objectWithFields: { [key: string]: any } = {};
+  for (let key of keys) {
+    objectWithFields[key] = object[key];
+  }
+  return objectWithFields;
+}
+
+function getFunctionInputWithoutSelector(input: string) {
+  return "0x" + input.slice(10);
+}
+
 export {
   formatFilters,
   getAddressAndTopicsOptions,
-  formatDecodedLogs,
-  getEventLabel,
-  sleep
+  sleep,
+  withFields,
+  getFunctionInputWithoutSelector,
 };

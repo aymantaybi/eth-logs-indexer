@@ -1,11 +1,13 @@
-import { Log } from "web3-core";
+import { Transaction } from "web3-core";
 
-interface DecodedLog extends Log {
-  decodedData: {
-    [key: string]: any;
+interface DecodedLog {
+  address: string;
+  event: {
+    signature: string;
+    name: string | undefined;
+    inputs: { [key: string]: number | string | object | string[] | object[] };
   };
-  event: string;
-};
-
+  transaction?: { [key: string]: any };
+}
 
 export default DecodedLog;
