@@ -1,15 +1,11 @@
-import Web3 from "web3";
-import { decodeLog } from "eth-logs-decoder";
-import { Filter, FormattedFilter, DecodedLog } from "./interfaces";
-import {
-  formatFilters,
-  getAddressAndTopicsOptions,
-  sleep,
-  withFields,
-} from "./utils";
-import logger from "./helpers/logger";
-import { executeAsync } from "./helpers/asyncBatch";
-import { Transaction } from "web3-core";
+import Web3 from 'web3';
+import ABICoder from 'web3-eth-abi';
+import { decodeInputs, decodeLog } from 'eth-logs-decoder';
+import { Filter, FormattedFilter, DecodedLog } from './interfaces';
+import { formatFilters, getAddressAndTopicsOptions, sleep, withFields, getFunctionInputWithoutSelector } from './utils';
+import logger from './helpers/logger';
+import { executeAsync } from './helpers/asyncBatch';
+import { Transaction } from 'web3-core';
 
 interface Constructor {
   host: string;
@@ -47,15 +43,9 @@ class Indexer {
     confirmationBlocks: 12,
     include: { transaction: false },
   };
-  ignoreDelay: boolean = false;
+  ignoreDelay = false;
 
-  constructor({
-    host,
-    filters,
-    save,
-    latestBlockNumber,
-    options,
-  }: Constructor) {
+  constructor({ host, filters, save, latestBlockNumber, options }: Constructor) {
     this.websocketProvider = new Web3.providers.WebsocketProvider(host);
     this.web3 = new Web3(this.websocketProvider);
     this.filters = filters;
@@ -69,9 +59,9 @@ class Indexer {
   }
 
   async main(blockNumber?: number) {
-    let formattedFilters = formatFilters(this.filters);
+    const formattedFilters = formatFilters(this.filters);
 
-    let { address, topics } = getAddressAndTopicsOptions(formattedFilters);
+    const { address, topics } = getAddressAndTopicsOptions(formattedFilters);
 
     this.ignoreDelay = false;
 
@@ -79,15 +69,11 @@ class Indexer {
       this.block.to = blockNumber;
       this.block.from = this.block.to - this.options.maxBlocks;
     } else {
-      this.block.to =
-        (await this.web3.eth.getBlockNumber()) -
-        this.options.confirmationBlocks;
+      this.block.to = (await this.web3.eth.getBlockNumber()) - this.options.confirmationBlocks;
       this.block.from = (await this.latestBlockNumber.load()) + 1;
       if (this.block.to - this.block.from > this.options.maxBlocks) {
         logger.warn(
-          `Max blocks number exceeded (${
-            this.block.to - this.block.from
-          } block), Iteration delay is ignored`
+          `Max blocks number exceeded (${this.block.to - this.block.from} block), Iteration delay is ignored`,
         );
         this.ignoreDelay = true;
         this.block.to = this.block.from + this.options.maxBlocks;
@@ -96,11 +82,9 @@ class Indexer {
       }
     }
 
-    logger.info(
-      `Processing logs from block ${this.block.from} to block ${this.block.to}`
-    );
+    logger.info(`Processing logs from block ${this.block.from} to block ${this.block.to}`);
 
-    let pastLogs = await this.web3.eth.getPastLogs({
+    const pastLogs = await this.web3.eth.getPastLogs({
       address,
       topics,
       fromBlock: this.block.from,
@@ -108,53 +92,71 @@ class Indexer {
     });
 
     if (pastLogs.length) {
-      let getTransaction: any = this.web3.eth.getTransaction;
+      const getTransaction: any = this.web3.eth.getTransaction;
 
-      let batch: any = new this.web3.BatchRequest();
-      let logs: DecodedLog[] = [];
+      const batch: any = new this.web3.BatchRequest();
+      const logs: DecodedLog[] = [];
 
-      for (let pastLog of pastLogs) {
-        let { transactionHash } = pastLog;
-        let test = (request: any) => request.params[0] == transactionHash;
+      for (const pastLog of pastLogs) {
+        const { transactionHash } = pastLog;
+        const test = (request: any) => request.params[0] == transactionHash;
         if (batch.requests.some(test)) continue;
         batch.add(getTransaction.request(transactionHash));
       }
 
-      let transactions: Transaction[] = await executeAsync(batch);
+      const transactions: Transaction[] = await executeAsync(batch);
 
-      for (let pastLog of pastLogs) {
-        let formattedFilter = formattedFilters.find(
+      for (const pastLog of pastLogs) {
+        const formattedFilter = formattedFilters.find(
           (formattedFilter) =>
-            formattedFilter.address == pastLog.address &&
-            formattedFilter.eventSignature == pastLog.topics[0]
+            formattedFilter.address == pastLog.address && formattedFilter.eventSignature == pastLog.topics[0],
         )!;
 
-        let { transactionHash } = pastLog;
+        const { transactionHash } = pastLog;
 
-        let eventJsonInterface = formattedFilter.jsonInterface.event;
+        const eventJsonInterface = formattedFilter.jsonInterface.event;
 
-        let log = decodeLog(pastLog, [eventJsonInterface]);
+        const functionJsonInterface = formattedFilter.jsonInterface.function;
+
+        const baseLog = decodeLog(pastLog, [eventJsonInterface]);
+
+        let log: DecodedLog = baseLog;
+
+        const transaction: Transaction = transactions.find((transaction) => transaction.hash == transactionHash)!;
+
+        if (functionJsonInterface?.inputs) {
+          const functionSignature = ABICoder.encodeFunctionSignature(functionJsonInterface);
+
+          const functionInputWithoutSelector = getFunctionInputWithoutSelector(transaction.input);
+
+          const inputs: any = transaction.input.startsWith(functionSignature)
+            ? decodeInputs(functionInputWithoutSelector, functionJsonInterface.inputs)
+            : {};
+
+          log = {
+            ...log,
+            function: {
+              inputs,
+            },
+          };
+        }
 
         if (this.options.include.transaction) {
-          let transaction: { [key: string]: any } = transactions.find(
-            (transaction) => transaction.hash == transactionHash
-          )!;
-
-          let fields = Array.isArray(this.options.include.transaction)
+          const fields = Array.isArray(this.options.include.transaction)
             ? this.options.include.transaction
             : Object.keys(transaction);
 
-          logs.push({
+          log = {
             ...log,
             transaction: withFields(transaction, fields),
-          });
-        } else {
-          logs.push(log);
+          };
         }
+
+        logs.push(log);
       }
 
       await this.save(logs);
-      logger.info(`${logs.length} logs saved`);
+      logger.info(`${logs.length} log saved`);
     }
     await this.latestBlockNumber.save(this.block.to);
     logger.info(`Last processed block number (${this.block.to}) saved`);

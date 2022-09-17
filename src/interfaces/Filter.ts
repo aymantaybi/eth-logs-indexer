@@ -1,9 +1,10 @@
-import { AbiItem, AbiInput } from "web3-utils";
+import { AbiItem } from 'web3-utils';
 
 interface Filter {
   address: string;
   jsonInterface: {
     event: AbiItem;
+    function?: AbiItem;
   };
 }
 

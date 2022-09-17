@@ -1,4 +1,4 @@
-import Filter from "./Filter";
+import Filter from './Filter';
 
 interface FormattedFilter extends Filter {
   eventSignature: string;

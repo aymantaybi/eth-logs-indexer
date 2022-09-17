@@ -1,6 +1,6 @@
-const Jsonrpc = require("web3-core-requestmanager/src/jsonrpc");
+const Jsonrpc = require('web3-core-requestmanager/src/jsonrpc');
 
-var { errors } = require("web3-core-helpers");
+var { errors } = require('web3-core-helpers');
 
 function executeAsync(batch: any): any {
   return new Promise((resolve, reject) => {
@@ -22,9 +22,7 @@ function executeAsync(batch: any): any {
             return errors.InvalidResponse(result);
           }
 
-          return requests[index].format
-            ? requests[index].format(result.result)
-            : result.result;
+          return requests[index].format ? requests[index].format(result.result) : result.result;
         });
 
       resolve(response);
