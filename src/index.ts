@@ -1,11 +1,12 @@
 import Web3 from 'web3';
 import ABICoder from 'web3-eth-abi';
+import { Transaction } from 'web3-core';
+import { WebsocketProvider } from 'web3-providers-ws';
 import { decodeInputs, decodeLog } from 'eth-logs-decoder';
 import { Filter, FormattedFilter, DecodedLog } from './interfaces';
 import { formatFilters, getAddressAndTopicsOptions, sleep, withFields, getFunctionInputWithoutSelector } from './utils';
 import logger from './helpers/logger';
 import { executeAsync } from './helpers/asyncBatch';
-import { Transaction } from 'web3-core';
 
 interface Constructor {
   host: string;
@@ -26,7 +27,7 @@ interface LatestBlockNumber {
 }
 
 class Indexer {
-  websocketProvider: any;
+  websocketProvider: WebsocketProvider;
   web3: Web3;
   filters: Filter[];
   save: (logs: DecodedLog[]) => Promise<void>;
@@ -44,6 +45,7 @@ class Indexer {
     include: { transaction: false },
   };
   ignoreDelay = false;
+  stopping = false;
 
   constructor({ host, filters, save, latestBlockNumber, options }: Constructor) {
     this.websocketProvider = new Web3.providers.WebsocketProvider(host);
@@ -110,7 +112,12 @@ class Indexer {
         const formattedFilter = formattedFilters.find(
           (formattedFilter) =>
             formattedFilter.address == pastLog.address && formattedFilter.eventSignature == pastLog.topics[0],
-        )!;
+        );
+
+        if (!formattedFilter)
+          throw new Error(
+            `Unable to find the corresponding filter for address ${pastLog.address} and signature ${pastLog.topics[0]}`,
+          );
 
         const { transactionHash } = pastLog;
 
@@ -122,7 +129,9 @@ class Indexer {
 
         let log: DecodedLog = baseLog;
 
-        const transaction: Transaction = transactions.find((transaction) => transaction.hash == transactionHash)!;
+        const transaction = transactions.find((transaction) => transaction.hash == transactionHash);
+
+        if (!transaction) throw new Error(`Unable to find the corresponding transaction for hash ${transactionHash}`);
 
         if (functionJsonInterface?.inputs) {
           const functionSignature = ABICoder.encodeFunctionSignature(functionJsonInterface);
@@ -133,9 +142,17 @@ class Indexer {
             ? decodeInputs(functionInputWithoutSelector, functionJsonInterface.inputs)
             : {};
 
+          const signature = transaction.input.startsWith(functionSignature)
+            ? functionSignature
+            : transaction.input.slice(0, 10);
+
+          const name = transaction.input.startsWith(functionSignature) ? functionJsonInterface.name : null;
+
           log = {
             ...log,
             function: {
+              signature,
+              name,
               inputs,
             },
           };
@@ -163,11 +180,19 @@ class Indexer {
   }
 
   async start(blockNumber?: number) {
+    if (this.stopping) {
+      this.stopping = false;
+      return;
+    }
     await this.main(blockNumber);
     if (!this.ignoreDelay) {
       await sleep(this.options.delay);
     }
     this.start();
+  }
+
+  stop() {
+    this.stopping = true;
   }
 }
 
