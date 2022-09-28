@@ -3,14 +3,13 @@ import ABICoder from 'web3-eth-abi';
 import { Transaction } from 'web3-core';
 import { WebsocketProvider } from 'web3-providers-ws';
 import { decodeInputs, decodeLog } from 'eth-logs-decoder';
-import { Filter, FormattedFilter, DecodedLog } from './interfaces';
+import { Filter, FormattedFilter, DecodedLog, LatestBlockNumber } from './interfaces';
 import { formatFilters, getAddressAndTopicsOptions, sleep, withFields, getFunctionInputWithoutSelector } from './utils';
 import logger from './helpers/logger';
 import { executeAsync } from './helpers/asyncBatch';
 
 interface Constructor {
   host: string;
-  filters: Filter[];
   save: (logs: DecodedLog[]) => Promise<void>;
   latestBlockNumber: LatestBlockNumber;
   options?: {
@@ -21,15 +20,10 @@ interface Constructor {
   };
 }
 
-interface LatestBlockNumber {
-  load: () => Promise<number>;
-  save: (blockNumber: number) => Promise<void>;
-}
-
 class Indexer {
   websocketProvider: WebsocketProvider;
   web3: Web3;
-  filters: Filter[];
+  filters: Filter[] | undefined;
   save: (logs: DecodedLog[]) => Promise<void>;
   latestBlockNumber: LatestBlockNumber;
   block: { from: number; to: number };
@@ -46,11 +40,11 @@ class Indexer {
   };
   ignoreDelay = false;
   stopping = false;
+  chainId = -1;
 
-  constructor({ host, filters, save, latestBlockNumber, options }: Constructor) {
+  constructor({ host, save, latestBlockNumber, options }: Constructor) {
     this.websocketProvider = new Web3.providers.WebsocketProvider(host);
     this.web3 = new Web3(this.websocketProvider);
-    this.filters = filters;
     this.save = save;
     this.latestBlockNumber = latestBlockNumber;
     this.options = { ...this.options, ...options } as any;
@@ -60,7 +54,21 @@ class Indexer {
     };
   }
 
+  async initialize(filters: Filter[]) {
+    this.setFilters(filters);
+    this.chainId = await this.web3.eth.getChainId();
+    logger.info(`Chain Id : ${this.chainId}`);
+  }
+
+  setFilters(filters: Filter[]) {
+    this.filters = filters;
+  }
+
   async main(blockNumber?: number) {
+    if (!this.filters || (Array.isArray(this.filters) && !this.filters.length))
+      throw new Error('No initialized  filters !');
+    if (this.chainId == -1) logger.warn(`Unknow Chain Id : ${this.chainId}`);
+
     const formattedFilters = formatFilters(this.filters);
 
     const { address, topics } = getAddressAndTopicsOptions(formattedFilters);
@@ -198,4 +206,4 @@ class Indexer {
 
 export default Indexer;
 
-export { Filter, FormattedFilter };
+export { Filter, FormattedFilter, DecodedLog };

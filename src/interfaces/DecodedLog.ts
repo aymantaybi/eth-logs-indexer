@@ -1,6 +1,7 @@
 import { Transaction } from 'web3-core';
 
 interface DecodedLog {
+  tag?: string;
   address: string;
   event: {
     signature: string;
