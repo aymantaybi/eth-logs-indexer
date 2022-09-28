@@ -8,7 +8,7 @@ const logger = winston.createLogger({
     timestamp({
       format: 'YYYY-MM-DD hh:mm:ss.SSS A',
     }),
-    printf((info) => `[${info.timestamp}] [${info.level}] ${info.message}`),
+    printf((info) => `[${info.timestamp}] [eth-logs-indexer] [${info.level}] ${info.message}`),
   ),
   transports: [new winston.transports.Console()],
 });
