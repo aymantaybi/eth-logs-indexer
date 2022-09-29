@@ -42,6 +42,7 @@ class Indexer {
   ignoreDelay = false;
   chainId = -1;
   private mainFunctionController: any;
+  private controlledFunction: ((...params: any[]) => Promise<void | { queueTaskCanceled: boolean }>) | undefined;
 
   constructor({ host, save, latestBlockNumber, options }: Constructor) {
     this.websocketProvider = new Web3.providers.WebsocketProvider(host);
@@ -204,23 +205,28 @@ class Indexer {
   }
 
   async start(blockNumber?: number) {
-    const [controlledFunction, functionController] = createControlledAsync(async (blockNumber?: number) => {
-      await this.main(blockNumber);
-    });
-    this.mainFunctionController = functionController;
-    const result = await controlledFunction(blockNumber);
-    if (result?.queueTaskCanceled) {
-      return;
+    if (!this.mainFunctionController) {
+      const [controlledFunction, functionController] = createControlledAsync(async (blockNumber?: number) => {
+        if (!this.ignoreDelay) {
+          await sleep(this.options.delay);
+        }
+        await this.main(blockNumber);
+      });
+      this.controlledFunction = controlledFunction;
+      this.mainFunctionController = functionController;
+      this.ignoreDelay = true;
+      this.mainFunctionController.eventEmitter.setMaxListeners(1);
     }
-    if (this.mainFunctionController && !this.ignoreDelay) {
-      await sleep(this.options.delay);
-    }
+    if (!this.controlledFunction) return;
+    const result = await this.controlledFunction(blockNumber);
+    if (result?.queueTaskCanceled) return;
     this.start();
   }
 
   stop() {
-    this.mainFunctionController.resolve({ queueTaskCanceled: true });
-    this.mainFunctionController = null;
+    this.mainFunctionController?.resolve({ queueTaskCanceled: true });
+    this.controlledFunction = undefined;
+    this.mainFunctionController = undefined;
   }
 }
 
