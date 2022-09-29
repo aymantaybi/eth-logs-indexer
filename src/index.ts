@@ -116,68 +116,83 @@ class Indexer {
 
       const transactions: Transaction[] = await executeAsync(batch);
 
-      for (const pastLog of pastLogs) {
-        const formattedFilter = formattedFilters.find(
-          (formattedFilter) =>
-            formattedFilter.address == pastLog.address && formattedFilter.eventSignature == pastLog.topics[0],
+      for (const formattedFilter of formattedFilters) {
+        const filteredPastLogs = pastLogs.filter(
+          (pastLog) =>
+            pastLog.address == formattedFilter.address && pastLog.topics[0] == formattedFilter.eventSignature,
         );
 
-        if (!formattedFilter)
-          throw new Error(
-            `Unable to find the corresponding filter for address ${pastLog.address} and signature ${pastLog.topics[0]}`,
-          );
-
-        const { transactionHash } = pastLog;
+        if (filteredPastLogs.length == 0) continue;
 
         const eventJsonInterface = formattedFilter.jsonInterface.event;
 
         const functionJsonInterface = formattedFilter.jsonInterface.function;
 
-        const baseLog = decodeLog(pastLog, [eventJsonInterface]);
+        const { tag } = formattedFilter;
 
-        let log: DecodedLog = baseLog;
+        const filterMatchingLogs = filteredPastLogs.map((pastLog) => {
+          const { transactionHash, logIndex } = pastLog;
 
-        const transaction = transactions.find((transaction) => transaction.hash == transactionHash);
+          const baseLog = decodeLog(pastLog, [eventJsonInterface]);
 
-        if (!transaction) throw new Error(`Unable to find the corresponding transaction for hash ${transactionHash}`);
+          let decodedLog: DecodedLog = { ...baseLog, filter: { tag }, logIndex };
 
-        if (functionJsonInterface?.inputs) {
-          const functionSignature = ABICoder.encodeFunctionSignature(functionJsonInterface);
+          const transaction = transactions.find((transaction) => transaction.hash == transactionHash);
 
-          const functionInputWithoutSelector = getFunctionInputWithoutSelector(transaction.input);
+          if (transaction && functionJsonInterface?.inputs) {
+            const functionSignature = ABICoder.encodeFunctionSignature(functionJsonInterface);
 
-          const inputs: any = transaction.input.startsWith(functionSignature)
-            ? decodeInputs(functionInputWithoutSelector, functionJsonInterface.inputs)
-            : {};
+            const functionInputWithoutSelector = getFunctionInputWithoutSelector(transaction.input);
 
-          const signature = transaction.input.startsWith(functionSignature)
-            ? functionSignature
-            : transaction.input.slice(0, 10);
+            const inputs: any = transaction.input.startsWith(functionSignature)
+              ? decodeInputs(functionInputWithoutSelector, functionJsonInterface.inputs)
+              : {};
 
-          const name = transaction.input.startsWith(functionSignature) ? functionJsonInterface.name : null;
+            const signature = transaction.input.startsWith(functionSignature)
+              ? functionSignature
+              : transaction.input.slice(0, 10);
 
-          log = {
-            ...log,
-            function: {
-              signature,
-              name,
-              inputs,
-            },
-          };
-        }
+            const name = transaction.input.startsWith(functionSignature) ? functionJsonInterface.name : null;
 
-        if (this.options.include.transaction) {
-          const fields = Array.isArray(this.options.include.transaction)
-            ? this.options.include.transaction
-            : Object.keys(transaction);
+            decodedLog = {
+              ...decodedLog,
+              function: {
+                signature,
+                name,
+                inputs,
+              },
+            };
+          }
 
-          log = {
-            ...log,
-            transaction: withFields(transaction, fields),
-          };
-        }
+          if (transaction && this.options.include.transaction) {
+            const fields = Array.isArray(this.options.include.transaction)
+              ? this.options.include.transaction
+              : Object.keys(transaction);
 
-        logs.push(log);
+            decodedLog = {
+              ...decodedLog,
+              transaction: withFields(transaction, fields),
+            };
+          }
+
+          return decodedLog;
+        });
+
+        logs.push(...filterMatchingLogs);
+      }
+
+      if (
+        logs.every(
+          (log) =>
+            !isNaN(log.transaction?.blockNumber as number) && !isNaN(log.transaction?.transactionIndex as number),
+        )
+      ) {
+        logs.sort(
+          (a, b) =>
+            a.transaction!.blockNumber! - b.transaction!.blockNumber! ||
+            a.transaction!.transactionIndex! - b.transaction!.transactionIndex! ||
+            a.logIndex - b.logIndex,
+        );
       }
 
       await this.save(logs);

@@ -1,19 +1,34 @@
-import { Transaction } from 'web3-core';
-
 interface DecodedLog {
-  tag?: string;
   address: string;
+  logIndex: number;
+  filter: {
+    tag?: string;
+  };
   event: {
     signature: string;
     name: string | undefined;
-    inputs: { [key: string]: number | string | object | string[] | object[] };
+    inputs: { [key: string]: any };
   };
   function?: {
     signature: string;
     name: string | undefined | null;
-    inputs: { [key: string]: number | string | object | string[] | object[] };
+    inputs: { [key: string]: any };
   };
-  transaction?: { [key: string]: any };
+  transaction?: {
+    hash?: string;
+    nonce?: number;
+    blockHash?: string;
+    blockNumber?: number;
+    transactionIndex?: number;
+    from?: string;
+    to?: string | null;
+    value?: string;
+    gasPrice?: string;
+    maxPriorityFeePerGas?: number | string;
+    maxFeePerGas?: number | string;
+    gas?: number;
+    input?: string;
+  };
 }
 
 export default DecodedLog;
