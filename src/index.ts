@@ -7,6 +7,7 @@ import { Filter, FormattedFilter, DecodedLog, LatestBlockNumber } from './interf
 import { formatFilters, getAddressAndTopicsOptions, sleep, withFields, getFunctionInputWithoutSelector } from './utils';
 import logger from './helpers/logger';
 import { executeAsync } from './helpers/asyncBatch';
+import { createControlledAsync } from 'controlled-async';
 
 interface Constructor {
   host: string;
@@ -39,8 +40,8 @@ class Indexer {
     include: { transaction: false },
   };
   ignoreDelay = false;
-  stopping = false;
   chainId = -1;
+  private mainFunctionController: any;
 
   constructor({ host, save, latestBlockNumber, options }: Constructor) {
     this.websocketProvider = new Web3.providers.WebsocketProvider(host);
@@ -57,7 +58,7 @@ class Indexer {
   async initialize(filters: Filter[]) {
     this.setFilters(filters);
     this.chainId = await this.web3.eth.getChainId();
-    logger.info(`Chain Id : ${this.chainId}`);
+    logger.info(`Chain Id: ${this.chainId}`);
   }
 
   setFilters(filters: Filter[]) {
@@ -203,19 +204,23 @@ class Indexer {
   }
 
   async start(blockNumber?: number) {
-    if (this.stopping) {
-      this.stopping = false;
+    const [controlledFunction, functionController] = createControlledAsync(async (blockNumber?: number) => {
+      await this.main(blockNumber);
+    });
+    this.mainFunctionController = functionController;
+    const result = await controlledFunction(blockNumber);
+    if (result?.queueTaskCanceled) {
       return;
     }
-    await this.main(blockNumber);
-    if (!this.ignoreDelay) {
+    if (this.mainFunctionController && !this.ignoreDelay) {
       await sleep(this.options.delay);
     }
     this.start();
   }
 
   stop() {
-    this.stopping = true;
+    this.mainFunctionController.resolve({ queueTaskCanceled: true });
+    this.mainFunctionController = null;
   }
 }
 

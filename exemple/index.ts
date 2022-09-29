@@ -1,186 +1,327 @@
 import * as dotenv from 'dotenv';
-import Web3 from 'web3';
-import Indexer, { Filter } from '../src';
-import { DecodedLog } from '../src/interfaces';
-import { AbiItem, AbiInput } from 'web3-utils';
-import { getFunctionInputWithoutSelector } from '../src/utils';
-import { decodeInputs } from 'eth-logs-decoder';
 
 dotenv.config();
 
-const { WEBSOCKET_PROVIDER_HOST } = process.env;
+import { AbiItem } from 'web3-utils';
+import { MongoClient } from 'mongodb';
+import ABICoder from 'web3-eth-abi';
+import { decodeInputs } from 'eth-logs-decoder';
+import Indexer, { Filter } from '../src';
+import { DecodedLog } from '../src/interfaces';
+import { getFunctionInputWithoutSelector } from '../src/utils';
 
-const OrderMatchedEventInterface: AbiItem = {
-  anonymous: false,
-  inputs: [
-    {
-      indexed: false,
-      internalType: 'bytes32',
-      name: 'hash',
-      type: 'bytes32',
-    },
-    {
-      indexed: false,
-      internalType: 'address',
-      name: 'maker',
-      type: 'address',
-    },
-    {
-      indexed: false,
-      internalType: 'address',
-      name: 'matcher',
-      type: 'address',
-    },
-    {
-      indexed: false,
-      internalType: 'enum MarketOrder.OrderKind',
-      name: 'kind',
-      type: 'uint8',
-    },
-    {
-      indexed: false,
-      internalType: 'address',
-      name: 'bidToken',
-      type: 'address',
-    },
-    {
-      indexed: false,
-      internalType: 'uint256',
-      name: 'bidPrice',
-      type: 'uint256',
-    },
-    {
-      indexed: false,
-      internalType: 'address',
-      name: 'paymentToken',
-      type: 'address',
-    },
-    {
-      indexed: false,
-      internalType: 'uint256',
-      name: 'settlePrice',
-      type: 'uint256',
-    },
-    {
-      indexed: false,
-      internalType: 'uint256',
-      name: 'sellerReceived',
-      type: 'uint256',
-    },
-    {
-      indexed: false,
-      internalType: 'uint256',
-      name: 'marketFeePercentage',
-      type: 'uint256',
-    },
-    {
-      indexed: false,
-      internalType: 'uint256',
-      name: 'marketFeeTaken',
-      type: 'uint256',
-    },
-  ],
-  name: 'OrderMatched',
-  type: 'event',
+const { WEBSOCKET_PROVIDER_HOST, MONGODB_URI } = process.env;
+
+const mongoClient = new MongoClient(MONGODB_URI!);
+
+const eventsJsonInterfaces: { [eventName: string]: AbiItem } = {
+  OrderMatched: {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: 'bytes32',
+        name: 'hash',
+        type: 'bytes32',
+      },
+      {
+        indexed: false,
+        internalType: 'address',
+        name: 'maker',
+        type: 'address',
+      },
+      {
+        indexed: false,
+        internalType: 'address',
+        name: 'matcher',
+        type: 'address',
+      },
+      {
+        indexed: false,
+        internalType: 'enum MarketOrder.OrderKind',
+        name: 'kind',
+        type: 'uint8',
+      },
+      {
+        indexed: false,
+        internalType: 'address',
+        name: 'bidToken',
+        type: 'address',
+      },
+      {
+        indexed: false,
+        internalType: 'uint256',
+        name: 'bidPrice',
+        type: 'uint256',
+      },
+      {
+        indexed: false,
+        internalType: 'address',
+        name: 'paymentToken',
+        type: 'address',
+      },
+      {
+        indexed: false,
+        internalType: 'uint256',
+        name: 'settlePrice',
+        type: 'uint256',
+      },
+      {
+        indexed: false,
+        internalType: 'uint256',
+        name: 'sellerReceived',
+        type: 'uint256',
+      },
+      {
+        indexed: false,
+        internalType: 'uint256',
+        name: 'marketFeePercentage',
+        type: 'uint256',
+      },
+      {
+        indexed: false,
+        internalType: 'uint256',
+        name: 'marketFeeTaken',
+        type: 'uint256',
+      },
+    ],
+    name: 'OrderMatched',
+    type: 'event',
+  },
+  AxieSpawn: {
+    anonymous: false,
+    inputs: [
+      {
+        internalType: 'uint256',
+        indexed: true,
+        name: '_axieId',
+        type: 'uint256',
+      },
+    ],
+    name: 'AxieSpawn',
+    type: 'event',
+  },
+  AxieBreedCountUpdated: {
+    anonymous: false,
+    inputs: [
+      {
+        internalType: 'uint256',
+        indexed: true,
+        name: '_axieId',
+        type: 'uint256',
+      },
+      {
+        internalType: 'uint256',
+        indexed: true,
+        name: '_breedCount',
+        type: 'uint256',
+      },
+    ],
+    name: 'AxieBreedCountUpdated',
+    type: 'event',
+  },
+  AxieggSpawned: {
+    anonymous: false,
+    inputs: [
+      {
+        internalType: 'uint256',
+        indexed: true,
+        name: '_axieId',
+        type: 'uint256',
+      },
+      {
+        internalType: 'uint256',
+        indexed: true,
+        name: '_sireId',
+        type: 'uint256',
+      },
+      {
+        internalType: 'uint256',
+        indexed: true,
+        name: '_matronId',
+        type: 'uint256',
+      },
+      {
+        internalType: 'uint256',
+        name: 'birthDate',
+        type: 'uint256',
+      },
+      {
+        components: [
+          {
+            internalType: 'uint256',
+            name: 'x',
+            type: 'uint256',
+          },
+          {
+            internalType: 'uint256',
+            name: 'y',
+            type: 'uint256',
+          },
+        ],
+        internalType: 'struct AxieGenetics.Genes',
+        name: 'sireGenes',
+        type: 'tuple',
+      },
+      {
+        components: [
+          {
+            internalType: 'uint256',
+            name: 'x',
+            type: 'uint256',
+          },
+          {
+            internalType: 'uint256',
+            name: 'y',
+            type: 'uint256',
+          },
+        ],
+        internalType: 'struct AxieGenetics.Genes',
+        name: 'matronGenes',
+        type: 'tuple',
+      },
+    ],
+    name: 'AxieggSpawned',
+    type: 'event',
+  },
 };
 
-const AxieSpawnEventInterface: AbiItem = {
-  anonymous: false,
-  inputs: [
-    {
-      internalType: 'uint256',
-      indexed: true,
-      name: '_axieId',
-      type: 'uint256',
-    },
-  ],
-  name: 'AxieSpawn',
-  type: 'event',
-};
-
-const AxieBreedCountUpdatedEventInterface: AbiItem = {
-  anonymous: false,
-  inputs: [
-    {
-      internalType: 'uint256',
-      indexed: true,
-      name: '_axieId',
-      type: 'uint256',
-    },
-    {
-      internalType: 'uint256',
-      indexed: true,
-      name: '_breedCount',
-      type: 'uint256',
-    },
-  ],
-  name: 'AxieBreedCountUpdated',
-  type: 'event',
-};
-
-const AxieggSpawnedEventInterface: AbiItem = {
-  anonymous: false,
-  inputs: [
-    {
-      internalType: 'uint256',
-      indexed: true,
-      name: '_axieId',
-      type: 'uint256',
-    },
-    {
-      internalType: 'uint256',
-      indexed: true,
-      name: '_sireId',
-      type: 'uint256',
-    },
-    {
-      internalType: 'uint256',
-      indexed: true,
-      name: '_matronId',
-      type: 'uint256',
-    },
-    {
-      internalType: 'uint256',
-      name: 'birthDate',
-      type: 'uint256',
-    },
-    {
-      components: [
-        {
-          internalType: 'uint256',
-          name: 'x',
-          type: 'uint256',
-        },
-        {
-          internalType: 'uint256',
-          name: 'y',
-          type: 'uint256',
-        },
-      ],
-      internalType: 'struct AxieGenetics.Genes',
-      name: 'sireGenes',
-      type: 'tuple',
-    },
-    {
-      components: [
-        {
-          internalType: 'uint256',
-          name: 'x',
-          type: 'uint256',
-        },
-        {
-          internalType: 'uint256',
-          name: 'y',
-          type: 'uint256',
-        },
-      ],
-      internalType: 'struct AxieGenetics.Genes',
-      name: 'matronGenes',
-      type: 'tuple',
-    },
-  ],
-  name: 'AxieggSpawned',
-  type: 'event',
+const functionsJsonInterfaces: { [functionName: string]: AbiItem } = {
+  interactWith: {
+    inputs: [
+      {
+        internalType: 'string',
+        name: '_interface',
+        type: 'string',
+      },
+      {
+        internalType: 'bytes',
+        name: '_data',
+        type: 'bytes',
+      },
+    ],
+    name: 'interactWith',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  settleOrder: {
+    inputs: [
+      {
+        internalType: 'uint256',
+        name: '_expectedState',
+        type: 'uint256',
+      },
+      {
+        internalType: 'uint256',
+        name: '_settlePrice',
+        type: 'uint256',
+      },
+      {
+        internalType: 'address',
+        name: '_referralAddr',
+        type: 'address',
+      },
+      {
+        internalType: 'bytes',
+        name: '_signature',
+        type: 'bytes',
+      },
+      {
+        components: [
+          {
+            internalType: 'address',
+            name: 'maker',
+            type: 'address',
+          },
+          {
+            internalType: 'enum MarketOrder.OrderKind',
+            name: 'kind',
+            type: 'uint8',
+          },
+          {
+            components: [
+              {
+                internalType: 'enum MarketAsset.TokenStandard',
+                name: 'erc',
+                type: 'uint8',
+              },
+              {
+                internalType: 'address',
+                name: 'addr',
+                type: 'address',
+              },
+              {
+                internalType: 'uint256',
+                name: 'id',
+                type: 'uint256',
+              },
+              {
+                internalType: 'uint256',
+                name: 'quantity',
+                type: 'uint256',
+              },
+            ],
+            internalType: 'struct MarketAsset.Asset[]',
+            name: 'assets',
+            type: 'tuple[]',
+          },
+          {
+            internalType: 'uint256',
+            name: 'expiredAt',
+            type: 'uint256',
+          },
+          {
+            internalType: 'address',
+            name: 'paymentToken',
+            type: 'address',
+          },
+          {
+            internalType: 'uint256',
+            name: 'startedAt',
+            type: 'uint256',
+          },
+          {
+            internalType: 'uint256',
+            name: 'basePrice',
+            type: 'uint256',
+          },
+          {
+            internalType: 'uint256',
+            name: 'endedAt',
+            type: 'uint256',
+          },
+          {
+            internalType: 'uint256',
+            name: 'endedPrice',
+            type: 'uint256',
+          },
+          {
+            internalType: 'uint256',
+            name: 'expectedState',
+            type: 'uint256',
+          },
+          {
+            internalType: 'uint256',
+            name: 'nonce',
+            type: 'uint256',
+          },
+          {
+            internalType: 'uint256',
+            name: 'marketFeePercentage',
+            type: 'uint256',
+          },
+        ],
+        internalType: 'struct MarketOrder.Order',
+        name: '_order',
+        type: 'tuple',
+      },
+    ],
+    name: 'settleOrder',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
 };
 
 const host = WEBSOCKET_PROVIDER_HOST!;
@@ -213,100 +354,69 @@ const host = WEBSOCKET_PROVIDER_HOST!;
 
 const filters: Filter[] = [
   {
-    address: '0xa8754b9fa15fc18bb59458815510e40a12cd2014',
+    address: '0xfff9ce5f71ca6178d3beecedb61e7eff1602950e',
     jsonInterface: {
-      event: {
-        anonymous: false,
-        inputs: [
-          {
-            indexed: true,
-            name: 'from',
-            type: 'address',
-          },
-          {
-            indexed: true,
-            name: 'to',
-            type: 'address',
-          },
-          {
-            indexed: false,
-            name: 'value',
-            type: 'uint256',
-          },
-        ],
-        name: 'Transfer',
-        type: 'event',
-      },
-      function: {
-        constant: false,
-        inputs: [
-          {
-            name: '_to',
-            type: 'address',
-          },
-          {
-            name: '_value',
-            type: 'uint256',
-          },
-        ],
-        name: 'transfer',
-        outputs: [
-          {
-            name: '',
-            type: 'bool',
-          },
-        ],
-        payable: false,
-        stateMutability: 'nonpayable',
-        type: 'function',
-      },
+      event: eventsJsonInterfaces.OrderMatched,
+      function: functionsJsonInterfaces.interactWith,
+    },
+  },
+  {
+    tag: '#####',
+    address: '0x32950db2a7164ae833121501c797d79e7b79d74c',
+    jsonInterface: {
+      event: eventsJsonInterfaces.AxieBreedCountUpdated,
     },
   },
 ];
 
 const save = async (logs: DecodedLog[]) => {
-  const log = logs[0];
-  console.log(JSON.stringify(log, null, 4));
-
-  /* const functionInputWithoutSelector = getFunctionInputWithoutSelector(log.transaction!.input);
-
-  const inputs = [
-    {
-      internalType: 'uint256',
-      name: '_sireId',
-      type: 'uint256',
-    },
-    {
-      internalType: 'uint256',
-      name: '_matronId',
-      type: 'uint256',
-    },
-  ];
-
-  console.log(decodeInputs(functionInputWithoutSelector, inputs)); */
+  //console.log(JSON.stringify(logs, null, 4));
+  const settleOrderFunctionSignature = ABICoder.encodeFunctionSignature(functionsJsonInterfaces.settleOrder);
+  for (const log of logs) {
+    if (log.function?.name == 'interactWith') {
+      const { _interface, _data } = log.function?.inputs as { _interface: string; _data: string };
+      if (_interface == 'ORDER_EXCHANGE' && _data.startsWith(settleOrderFunctionSignature)) {
+        const functionInputWithoutSelector = getFunctionInputWithoutSelector(_data);
+        const decodedInputs = decodeInputs(functionInputWithoutSelector, functionsJsonInterfaces.settleOrder.inputs!);
+        //console.log(JSON.stringify(decodedInputs, null, 4));
+      }
+    }
+  }
+  await mongoClient.db('SmartLogs').collection('chainId:2020').insertMany(logs);
 };
 
-let currentBlockNumber = 16446435;
-
 const latestBlockNumber = {
-  load: async () => currentBlockNumber,
+  load: async () => {
+    const document = await mongoClient
+      .db('SmartLogs')
+      .collection('latestBlockNumber')
+      .findOne({ chainId: 2020 } as { chainId: number; blockNumber: number });
+    const blockNumber = document?.blockNumber ?? 0;
+    return blockNumber;
+  },
   save: async (blockNumber: number) => {
-    currentBlockNumber = blockNumber;
+    await mongoClient
+      .db('SmartLogs')
+      .collection('latestBlockNumber')
+      .updateOne({ chainId: 2020 }, { $set: { blockNumber: blockNumber } });
   },
 };
 
 const options = {
   include: {
-    transaction: ['blockNumber', 'from', 'hash', 'transactionIndex', 'input'],
+    transaction: ['blockNumber', 'from', 'hash', 'transactionIndex'],
   },
 };
 
 const indexer = new Indexer({
   host,
-  filters,
   save,
   latestBlockNumber,
   options,
 });
 
-indexer.start(currentBlockNumber);
+(async () => {
+  await mongoClient.connect();
+  await indexer.initialize(filters);
+  indexer.start(17610652);
+})();
