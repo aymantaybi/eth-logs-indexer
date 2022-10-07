@@ -228,6 +228,10 @@ class Indexer {
     this.controlledFunction = undefined;
     this.mainFunctionController = undefined;
   }
+
+  isRunning() {
+    return this.mainFunctionController && this.controlledFunction;
+  }
 }
 
 export default Indexer;
