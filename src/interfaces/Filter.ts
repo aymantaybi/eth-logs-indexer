@@ -7,6 +7,11 @@ interface Filter {
     event: AbiItem;
     function?: AbiItem;
   };
+  options?: {
+    include?: {
+      transaction?: boolean | string[];
+    };
+  };
 }
 
 export default Filter;

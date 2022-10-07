@@ -32,12 +32,10 @@ class Indexer {
     delay: number;
     maxBlocks: number;
     confirmationBlocks: number;
-    include: { transaction: boolean | string[] };
   } = {
     delay: 10000,
     maxBlocks: 10,
     confirmationBlocks: 12,
-    include: { transaction: false },
   };
   ignoreDelay = false;
   chainId = -1;
@@ -170,9 +168,9 @@ class Indexer {
             };
           }
 
-          if (transaction && this.options.include.transaction) {
-            const fields = Array.isArray(this.options.include.transaction)
-              ? this.options.include.transaction
+          if (transaction && formattedFilter.options?.include?.transaction) {
+            const fields = Array.isArray(formattedFilter.options?.include?.transaction)
+              ? formattedFilter.options?.include?.transaction
               : Object.keys(transaction);
 
             decodedLog = {
