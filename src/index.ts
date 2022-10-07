@@ -73,7 +73,7 @@ class Indexer {
       return;
     }
 
-    if (this.chainId == -1) logger.warn(`Unknow Chain Id : ${this.chainId}`);
+    if (this.chainId == -1) logger.warn(`Unknown Chain Id : ${this.chainId}`);
 
     const formattedFilters = formatFilters(this.filters);
 
