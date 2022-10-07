@@ -17,7 +17,6 @@ interface Constructor {
     delay?: number;
     maxBlocks?: number;
     confirmationBlocks?: number;
-    include?: { transaction?: boolean | string[] };
   };
 }
 
