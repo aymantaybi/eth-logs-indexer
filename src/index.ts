@@ -220,10 +220,11 @@ class Indexer {
       this.mainFunctionController = functionController;
       this.ignoreDelay = true;
       this.mainFunctionController.eventEmitter.setMaxListeners(1);
+      logger.info('Indexer started !');
     }
     if (!this.controlledFunction) return;
     const result = await this.controlledFunction(blockNumber);
-    if (result?.queueTaskCanceled) return;
+    if (result?.queueTaskCanceled) return logger.info('Indexer stopped !');
     this.start();
   }
 
