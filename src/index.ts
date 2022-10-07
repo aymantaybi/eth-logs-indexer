@@ -67,8 +67,12 @@ class Indexer {
   }
 
   async main(blockNumber?: number) {
-    if (!this.filters || (Array.isArray(this.filters) && !this.filters.length))
-      throw new Error('No initialized  filters !');
+    if (!this.filters || (Array.isArray(this.filters) && !this.filters.length)) {
+      logger.error('No initialized  filters !');
+      this.stop();
+      return;
+    }
+
     if (this.chainId == -1) logger.warn(`Unknow Chain Id : ${this.chainId}`);
 
     const formattedFilters = formatFilters(this.filters);
