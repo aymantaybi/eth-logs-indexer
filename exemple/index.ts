@@ -412,7 +412,6 @@ const indexer = new Indexer({
   host,
   save,
   latestBlockNumber,
-  options,
 });
 
 (async () => {

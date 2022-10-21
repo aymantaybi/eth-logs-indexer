@@ -2,6 +2,7 @@ import { AbiItem } from 'web3-utils';
 
 interface Filter {
   tag?: string;
+  chainId?: number;
   address: string;
   jsonInterface: {
     event: AbiItem;
