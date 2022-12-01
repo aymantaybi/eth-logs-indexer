@@ -75,8 +75,7 @@ class Indexer {
   async main(blockNumber?: number) {
     if (!this.filters || (Array.isArray(this.filters) && !this.filters.length)) {
       logger.error('No initialized  filters !');
-      this.stop();
-      return;
+      return this.stop();
     }
 
     if (this.chainId == -1) logger.warn(`Unknown Chain Id : ${this.chainId}`);
@@ -100,7 +99,7 @@ class Indexer {
         this.ignoreDelay = true;
         this.block.to = this.block.from + this.options.maxBlocks;
       } else if (this.block.to - this.block.from < 0) {
-        return;
+        return this.stop();
       }
     }
 
@@ -238,6 +237,7 @@ class Indexer {
     this.mainFunctionController?.resolve({ queueTaskCanceled: true });
     this.controlledFunction = undefined;
     this.mainFunctionController = undefined;
+    return { queueTaskCanceled: true };
   }
 
   isRunning() {
