@@ -417,5 +417,113 @@ const indexer = new Indexer({
 (async () => {
   await mongoClient.connect();
   await indexer.initialize(filters);
-  indexer.start(17610652);
+
+  const filter: Filter = {
+    address: '0xa8754b9fa15fc18bb59458815510e40a12cd2014',
+    jsonInterface: {
+      event: {
+        anonymous: false,
+        name: 'Transfer',
+        type: 'event',
+        inputs: [
+          {
+            indexed: true,
+            name: 'from',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            name: 'to',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            name: 'value',
+            type: 'uint256',
+          },
+        ],
+      },
+      function: {
+        anonymous: false,
+        name: 'withdraw',
+        type: 'function',
+        inputs: [
+          {
+            indexed: false,
+            name: '_withdrawal',
+            type: 'tuple',
+            components: [
+              {
+                name: 'owner',
+                type: 'address',
+              },
+              {
+                name: 'nonce',
+                type: 'uint256',
+              },
+              {
+                name: 'expiredAt',
+                type: 'uint256',
+              },
+              {
+                name: 'assets',
+                type: 'tuple[]',
+                components: [
+                  {
+                    name: 'erc',
+                    type: 'uint8',
+                  },
+                  {
+                    name: 'addr',
+                    type: 'address',
+                  },
+                  {
+                    name: 'id',
+                    type: 'uint256',
+                  },
+                  {
+                    name: 'quantity',
+                    type: 'uint256',
+                  },
+                  {
+                    name: 'rarity',
+                    type: 'uint8',
+                  },
+                ],
+              },
+              {
+                name: 'extraData',
+                type: 'bytes',
+              },
+            ],
+          },
+          {
+            indexed: false,
+            name: '_signature',
+            type: 'bytes',
+          },
+          {
+            indexed: false,
+            name: '_path',
+            type: 'address[]',
+          },
+        ],
+      },
+    },
+    chainId: 2020,
+    options: {
+      include: {
+        transaction: ['hash', 'from', 'transactionIndex', 'blockNumber'],
+      },
+    },
+  };
+
+  const preview = await indexer.previewLogs(
+    filter,
+    '0xa4b9bb8eb15d2de5d3f3657703065544fc20c758f1f37d4949e4aef35908ae33',
+  );
+
+  console.log(JSON.stringify(preview, null, 4));
+
+  //indexer.start(17610652);
 })();

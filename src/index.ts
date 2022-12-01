@@ -4,10 +4,19 @@ import { Transaction } from 'web3-core';
 import { WebsocketProvider } from 'web3-providers-ws';
 import { decodeInputs, decodeLog } from 'eth-logs-decoder';
 import { Filter, FormattedFilter, DecodedLog, LatestBlockNumber } from './interfaces';
-import { formatFilters, getAddressAndTopicsOptions, sleep, withFields, getFunctionInputWithoutSelector } from './utils';
+import {
+  formatFilters,
+  getAddressAndTopicsOptions,
+  sleep,
+  withFields,
+  getFunctionInputWithoutSelector,
+  addFunctionFieldToLogObject,
+  addTransactionFieldsToLogObject,
+} from './utils';
 import logger from './helpers/logger';
 import { executeAsync } from './helpers/asyncBatch';
 import { createControlledAsync } from 'controlled-async';
+import RawLog from './interfaces/RawLog';
 
 interface Constructor {
   host: string;
@@ -233,6 +242,46 @@ class Indexer {
 
   isRunning() {
     return this.mainFunctionController && this.controlledFunction;
+  }
+
+  async previewLogs(filter: Filter, transactionHash: string) {
+    const getTransactionReceipt = this.web3.eth.getTransactionReceipt;
+    const getTransaction = this.web3.eth.getTransaction;
+
+    const filterAddress = filter.address.toLowerCase();
+    const filterEventJsonInterface = filter.jsonInterface.event;
+    const filterEventSignature = ABICoder.encodeEventSignature(filterEventJsonInterface);
+    const filterFunctionJsonInterface = filter.jsonInterface.function;
+    const filterTransactionIncludes = filter.options?.include?.transaction;
+
+    const functionInputsOrTransactionIncludes = filterFunctionJsonInterface?.inputs || filterTransactionIncludes;
+
+    const transaction = functionInputsOrTransactionIncludes ? await getTransaction(transactionHash) : undefined;
+    const transactionReceipt = await getTransactionReceipt(transactionHash);
+
+    const logs = transactionReceipt.logs.filter(
+      (receiptLog) =>
+        receiptLog.address.toLowerCase() === filterAddress && receiptLog.topics[0] === filterEventSignature,
+    );
+
+    if (!logs.length) throw new Error('No logs in the transaction receipt with the filter event signature');
+
+    const previews: DecodedLog[] = [];
+
+    for (const log of logs) {
+      const rawLog: RawLog = decodeLog(log, [filterEventJsonInterface]);
+      const { logIndex } = log;
+      const decodedLog: DecodedLog = {
+        ...rawLog,
+        ...addFunctionFieldToLogObject(rawLog, transaction, filterFunctionJsonInterface),
+        ...addTransactionFieldsToLogObject(rawLog, transaction, filterTransactionIncludes),
+        logIndex,
+        filter: { tag: undefined },
+      };
+      previews.push(decodedLog);
+    }
+
+    return previews;
   }
 }
 
