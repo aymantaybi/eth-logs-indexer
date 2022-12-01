@@ -25,7 +25,7 @@
   },
   "name": "eth-logs-indexer",
   "description": "Pull EVM blockchain logs and save the decoded output to a local database",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "main": "dist/index.js",
   "files": [
     "/dist"
