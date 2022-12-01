@@ -523,7 +523,7 @@ const indexer = new Indexer({
     '0xa4b9bb8eb15d2de5d3f3657703065544fc20c758f1f37d4949e4aef35908ae33',
   );
 
-  console.log(JSON.stringify(preview, null, 4));
+  console.log(JSON.stringify(preview, null, 2));
 
   //indexer.start(17610652);
 })();
