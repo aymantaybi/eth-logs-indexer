@@ -2,8 +2,8 @@ import Utils from 'web3-utils';
 import ABICoder from 'web3-eth-abi';
 import { Transaction } from 'web3-core';
 import { decodeInputs } from 'eth-logs-decoder';
+import { AbiItem } from 'web3-utils';
 import { DecodedLog, Filter, FormattedFilter } from './interfaces';
-import RawLog from './interfaces/RawLog';
 
 function formatFilters(filters: Filter[]): FormattedFilter[] {
   return filters.map((filter) => {
@@ -52,7 +52,7 @@ function getFunctionInputWithoutSelector(input: string) {
 function addFunctionFieldToLogObject(
   logObject: Partial<DecodedLog>,
   transaction: Transaction | undefined,
-  functionJsonInterface: any,
+  functionJsonInterface: AbiItem | undefined,
 ): Partial<DecodedLog> {
   if (!transaction || !functionJsonInterface?.inputs) return logObject;
 
@@ -83,7 +83,7 @@ function addFunctionFieldToLogObject(
 function addTransactionFieldsToLogObject(
   logObject: Partial<DecodedLog>,
   transaction: Transaction | undefined,
-  fields: string[] | undefined | boolean,
+  fields: string[] | boolean | undefined,
 ): Partial<DecodedLog> {
   if (!transaction || !fields) return logObject;
 
