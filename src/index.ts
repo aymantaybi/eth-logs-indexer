@@ -15,8 +15,8 @@ import {
 } from './utils';
 import logger from './helpers/logger';
 import { executeAsync } from './helpers/asyncBatch';
-import { createControlledAsync } from 'controlled-async';
 import RawLog from './interfaces/RawLog';
+import { EventEmitter } from 'events';
 
 interface Constructor {
   host: string;
@@ -47,8 +47,8 @@ class Indexer {
   };
   ignoreDelay = false;
   chainId = -1;
-  private mainFunctionController: any;
-  private controlledFunction: ((...params: any[]) => Promise<void | { queueTaskCanceled: boolean }>) | undefined;
+  private eventEmitter: EventEmitter = new EventEmitter();
+  private onEnd: (() => Promise<void>) | undefined;
 
   constructor({ host, save, latestBlockNumber, options }: Constructor) {
     this.websocketProvider = new Web3.providers.WebsocketProvider(host);
@@ -80,6 +80,8 @@ class Indexer {
 
     if (this.chainId == -1) logger.warn(`Unknown Chain Id : ${this.chainId}`);
 
+    this.eventEmitter.emit('start');
+
     const formattedFilters = formatFilters(this.filters);
 
     const { address, topics } = getAddressAndTopicsOptions(formattedFilters);
@@ -99,7 +101,8 @@ class Indexer {
         this.ignoreDelay = true;
         this.block.to = this.block.from + this.options.maxBlocks;
       } else if (this.block.to - this.block.from < 0) {
-        return this.stop();
+        this.eventEmitter.emit('end');
+        return;
       }
     }
 
@@ -211,38 +214,33 @@ class Indexer {
     }
     await this.latestBlockNumber.save(this.block.to);
     logger.info(`Last processed block number (${this.block.to}) saved`);
+    this.eventEmitter.emit('end');
   }
 
-  async start(blockNumber?: number) {
-    if (!this.mainFunctionController) {
-      const [controlledFunction, functionController] = createControlledAsync(async (blockNumber?: number) => {
-        if (!this.ignoreDelay) {
-          await sleep(this.options.delay);
-        }
-        await this.main(blockNumber);
-      });
-      this.controlledFunction = controlledFunction;
-      this.mainFunctionController = functionController;
-      this.ignoreDelay = true;
-      this.mainFunctionController.eventEmitter.setMaxListeners(1);
-      logger.info('Indexer started !');
-    }
-    if (!this.controlledFunction) return;
-    const result = await this.controlledFunction(blockNumber);
-    console.log(result);
-    if (result?.queueTaskCanceled) return logger.info('Indexer stopped !');
-    this.start();
+  start(blockNumber?: number) {
+    if (this.onEnd) return false;
+    this.onEnd = async () => {
+      if (!this.ignoreDelay) {
+        await sleep(this.options.delay);
+      }
+      await this.main();
+    };
+    this.eventEmitter.on('end', this.onEnd);
+    this.main(blockNumber);
+    logger.info(`Indexer started !`);
+    return true;
   }
 
   stop() {
-    this.mainFunctionController?.resolve({ queueTaskCanceled: true });
-    this.controlledFunction = undefined;
-    this.mainFunctionController = undefined;
-    return { queueTaskCanceled: true };
+    if (!this.onEnd) return false;
+    this.eventEmitter.removeListener('end', this.onEnd);
+    this.onEnd = undefined;
+    logger.info(`Indexer stopped !`);
+    return true;
   }
 
   isRunning() {
-    return this.mainFunctionController && this.controlledFunction;
+    return Boolean(this.onEnd);
   }
 
   async previewLogs(filter: Filter, transactionHash: string) {
