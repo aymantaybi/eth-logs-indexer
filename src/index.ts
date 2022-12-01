@@ -229,6 +229,7 @@ class Indexer {
     }
     if (!this.controlledFunction) return;
     const result = await this.controlledFunction(blockNumber);
+    console.log(result);
     if (result?.queueTaskCanceled) return logger.info('Indexer stopped !');
     this.start();
   }
