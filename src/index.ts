@@ -80,7 +80,7 @@ class Indexer {
 
     if (this.chainId == -1) logger.warn(`Unknown Chain Id : ${this.chainId}`);
 
-    this.eventEmitter.emit('start');
+    this.eventEmitter.emit('begin');
 
     const formattedFilters = formatFilters(this.filters);
 
@@ -241,6 +241,22 @@ class Indexer {
 
   isRunning() {
     return Boolean(this.onEnd);
+  }
+
+  status() {
+    const chainId = this.chainId;
+    const isRunning = this.isRunning();
+    const blockNumber = this.block.from;
+    const filters = this.filters?.length || 0;
+    return { chainId, isRunning, blockNumber, filters };
+  }
+
+  onIterationBegin(callback: () => any) {
+    this.eventEmitter.on('begin', callback);
+  }
+
+  onIterationEnd(callback: () => any) {
+    this.eventEmitter.on('end', callback);
   }
 
   async previewLogs(filter: Filter, transactionHash: string) {
