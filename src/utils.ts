@@ -4,6 +4,7 @@ import { Transaction } from 'web3-core';
 import { decodeInputs } from 'eth-logs-decoder';
 import { AbiItem } from 'web3-utils';
 import { DecodedLog, Filter, FormattedFilter } from './interfaces';
+import { EventEmitter } from 'events';
 
 function formatFilters(filters: Filter[]): FormattedFilter[] {
   return filters.map((filter) => {
@@ -95,6 +96,26 @@ function addTransactionFieldsToLogObject(
   };
 }
 
+function waitForEvent(
+  eventEmitter: EventEmitter,
+  eventName: string,
+  options = { timeout: 0, condition: (...args: any) => true },
+) {
+  return new Promise((resolve, reject) => {
+    const timeoutID = options.timeout
+      ? setTimeout(() => {
+          listener(undefined);
+        }, options.timeout)
+      : 0;
+    const listener = (data: any) => {
+      if (options.condition && !options.condition(data)) return;
+      if (options.timeout) clearTimeout(timeoutID);
+      resolve(data);
+    };
+    eventEmitter.once(eventName, listener);
+  });
+}
+
 export {
   formatFilters,
   getAddressAndTopicsOptions,
@@ -103,4 +124,5 @@ export {
   getFunctionInputWithoutSelector,
   addTransactionFieldsToLogObject,
   addFunctionFieldToLogObject,
+  waitForEvent,
 };

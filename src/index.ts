@@ -12,6 +12,7 @@ import {
   getFunctionInputWithoutSelector,
   addFunctionFieldToLogObject,
   addTransactionFieldsToLogObject,
+  waitForEvent,
 } from './utils';
 import logger from './helpers/logger';
 import { executeAsync } from './helpers/asyncBatch';
@@ -217,7 +218,7 @@ class Indexer {
     this.eventEmitter.emit('end');
   }
 
-  start(blockNumber?: number) {
+  async start(blockNumber?: number) {
     if (this.onEnd) return false;
     this.onEnd = async () => {
       if (!this.ignoreDelay) {
@@ -227,13 +228,15 @@ class Indexer {
     };
     this.eventEmitter.on('end', this.onEnd);
     this.main(blockNumber);
+    await waitForEvent(this.eventEmitter, 'end', { timeout: 5000, condition: () => true });
     logger.info(`Indexer started !`);
     return true;
   }
 
-  stop() {
+  async stop() {
     if (!this.onEnd) return false;
     this.eventEmitter.removeListener('end', this.onEnd);
+    await waitForEvent(this.eventEmitter, 'end', { timeout: 5000, condition: () => true });
     this.onEnd = undefined;
     logger.info(`Indexer stopped !`);
     return true;
