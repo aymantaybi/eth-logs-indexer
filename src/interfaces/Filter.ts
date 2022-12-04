@@ -1,6 +1,7 @@
 import { AbiItem } from 'web3-utils';
 
 interface Filter {
+  id: string;
   tag?: string;
   chainId?: number;
   address: string;

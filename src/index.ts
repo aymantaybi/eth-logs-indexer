@@ -143,14 +143,14 @@ class Indexer {
 
         const functionJsonInterface = formattedFilter.jsonInterface.function;
 
-        const { tag } = formattedFilter;
+        const { id: filterId } = formattedFilter;
 
         const filterMatchingLogs = filteredPastLogs.map((pastLog) => {
           const { transactionHash, logIndex } = pastLog;
 
           const baseLog = decodeLog(pastLog, [eventJsonInterface]);
 
-          let decodedLog: DecodedLog = { ...baseLog, filter: { tag }, logIndex };
+          let decodedLog: DecodedLog = { ...baseLog, filterId, logIndex };
 
           const transaction = transactions.find((transaction) => transaction.hash == transactionHash);
 
@@ -294,7 +294,7 @@ class Indexer {
         ...addFunctionFieldToLogObject(rawLog, transaction, filterFunctionJsonInterface),
         ...addTransactionFieldsToLogObject(rawLog, transaction, filterTransactionIncludes),
         logIndex,
-        filter: { tag: undefined },
+        filterId: '',
       };
       previews.push(decodedLog);
     }

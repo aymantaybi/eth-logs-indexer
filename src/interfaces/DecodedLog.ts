@@ -1,9 +1,7 @@
 interface DecodedLog {
   address: string;
   logIndex: number;
-  filter: {
-    tag?: string;
-  };
+  filterId: string;
   event: {
     signature: string;
     name: string | undefined;
