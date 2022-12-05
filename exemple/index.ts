@@ -10,6 +10,25 @@ import Indexer, { Filter } from '../src';
 import { DecodedLog } from '../src/interfaces';
 import { getFunctionInputWithoutSelector } from '../src/utils';
 
+interface Options {
+  delay: number;
+  maxBlocks: number;
+  confirmationBlocks: number;
+}
+
+interface Save {
+  logs: (logs: DecodedLog[]) => Promise<void>;
+  filters: (filters: Filter[]) => Promise<void>;
+  options: (options: Options) => Promise<void>;
+  blockNumber: (blockNumber: number) => Promise<void>;
+}
+
+interface Load {
+  filters: () => Promise<Filter[]>;
+  options: () => Promise<Options>;
+  blockNumber: () => Promise<number>;
+}
+
 const { WEBSOCKET_PROVIDER_HOST, MONGODB_URI } = process.env;
 
 const mongoClient = new MongoClient(MONGODB_URI!);
@@ -354,6 +373,7 @@ const host = WEBSOCKET_PROVIDER_HOST!;
 
 const filters: Filter[] = [
   {
+    id: '1',
     address: '0xfff9ce5f71ca6178d3beecedb61e7eff1602950e',
     jsonInterface: {
       event: eventsJsonInterfaces.OrderMatched,
@@ -361,7 +381,7 @@ const filters: Filter[] = [
     },
   },
   {
-    tag: '#####',
+    id: '2',
     address: '0x32950db2a7164ae833121501c797d79e7b79d74c',
     jsonInterface: {
       event: eventsJsonInterfaces.AxieBreedCountUpdated,
@@ -399,12 +419,6 @@ const latestBlockNumber = {
       .db('SmartLogs')
       .collection('latestBlockNumber')
       .updateOne({ chainId: 2020 }, { $set: { blockNumber: blockNumber } });
-  },
-};
-
-const options = {
-  include: {
-    transaction: ['blockNumber', 'from', 'hash', 'transactionIndex'],
   },
 };
 
@@ -516,6 +530,7 @@ const indexer = new Indexer({
         transaction: ['hash', 'from', 'transactionIndex', 'blockNumber'],
       },
     },
+    id: '',
   };
 
   const preview = await indexer.previewLogs(

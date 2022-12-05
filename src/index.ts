@@ -23,6 +23,7 @@ interface Constructor {
   host: string;
   save: (logs: DecodedLog[]) => Promise<void>;
   latestBlockNumber: LatestBlockNumber;
+  filters?: Filter[];
   options?: {
     delay?: number;
     maxBlocks?: number;
@@ -33,11 +34,11 @@ interface Constructor {
 class Indexer {
   websocketProvider: WebsocketProvider;
   web3: Web3;
-  filters: Filter[] | undefined;
+  filters: Filter[];
   save: (logs: DecodedLog[]) => Promise<void>;
   latestBlockNumber: LatestBlockNumber;
   block: { from: number; to: number };
-  options: {
+  private options: {
     delay: number;
     maxBlocks: number;
     confirmationBlocks: number;
@@ -51,12 +52,13 @@ class Indexer {
   private eventEmitter: EventEmitter = new EventEmitter();
   private onEnd: (() => Promise<void>) | undefined;
 
-  constructor({ host, save, latestBlockNumber, options }: Constructor) {
+  constructor({ host, save, latestBlockNumber, filters = [], options = {} }: Constructor) {
     this.websocketProvider = new Web3.providers.WebsocketProvider(host);
     this.web3 = new Web3(this.websocketProvider);
     this.save = save;
     this.latestBlockNumber = latestBlockNumber;
-    this.options = { ...this.options, ...options } as any;
+    this.filters = filters;
+    this.options = { ...this.options, ...options };
     this.block = {
       from: -1,
       to: -1,
@@ -73,8 +75,12 @@ class Indexer {
     this.filters = filters;
   }
 
+  setOptions(options: { delay?: number; maxBlocks?: number; confirmationBlocks?: number }) {
+    this.options = { ...this.options, ...options };
+  }
+
   async main(blockNumber?: number) {
-    if (!this.filters || (Array.isArray(this.filters) && !this.filters.length)) {
+    if (!this.filters.length) {
       logger.error('No initialized  filters !');
       return this.stop();
     }
@@ -103,6 +109,7 @@ class Indexer {
         this.block.to = this.block.from + this.options.maxBlocks;
       } else if (this.block.to - this.block.from < 0) {
         this.eventEmitter.emit('end');
+        logger.error(`Block number "from" ${this.block.from}  is higher than Block number "to" ${this.block.to}`);
         return;
       }
     }
@@ -250,8 +257,9 @@ class Indexer {
     const chainId = this.chainId;
     const isRunning = this.isRunning();
     const blockNumber = this.block.from;
-    const filters = this.filters?.length || 0;
-    return { chainId, isRunning, blockNumber, filters };
+    const filters = this.filters.length || 0;
+    const options = this.options;
+    return { chainId, isRunning, blockNumber, filters, options };
   }
 
   onIterationBegin(callback: () => any) {
