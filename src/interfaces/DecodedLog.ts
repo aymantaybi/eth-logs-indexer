@@ -1,7 +1,6 @@
 interface DecodedLog {
-  address: string;
-  logIndex: number;
   filterId: string;
+  address: string;
   event: {
     signature: string;
     name: string | undefined;
@@ -27,6 +26,7 @@ interface DecodedLog {
     gas?: number;
     input?: string;
   };
+  logIndex: number;
 }
 
 export default DecodedLog;

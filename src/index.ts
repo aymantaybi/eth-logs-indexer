@@ -1,9 +1,9 @@
 import Web3 from 'web3';
 import ABICoder from 'web3-eth-abi';
 import { Transaction } from 'web3-core';
-import { WebsocketProvider } from 'web3-providers-ws';
+import { HttpProvider } from 'web3-providers-http';
 import { decodeInputs, decodeLog } from 'eth-logs-decoder';
-import { Filter, FormattedFilter, DecodedLog, LatestBlockNumber } from './interfaces';
+import { Filter, FormattedFilter, DecodedLog, Save, Load, Options } from './interfaces';
 import {
   formatFilters,
   getAddressAndTopicsOptions,
@@ -21,42 +21,36 @@ import { EventEmitter } from 'events';
 
 interface Constructor {
   host: string;
-  save: (logs: DecodedLog[]) => Promise<void>;
-  latestBlockNumber: LatestBlockNumber;
+  save: Save;
+  load: Load;
   filters?: Filter[];
-  options?: {
-    delay?: number;
-    maxBlocks?: number;
-    confirmationBlocks?: number;
-  };
+  options?: Partial<Options>;
 }
 
+const defaultIndexerOptions = {
+  delay: 10000,
+  maxBlocks: 10,
+  confirmationBlocks: 12,
+};
+
 class Indexer {
-  websocketProvider: WebsocketProvider;
+  httpProvider: HttpProvider;
   web3: Web3;
   filters: Filter[];
-  save: (logs: DecodedLog[]) => Promise<void>;
-  latestBlockNumber: LatestBlockNumber;
+  save: Save;
+  load: Load;
   block: { from: number; to: number };
-  private options: {
-    delay: number;
-    maxBlocks: number;
-    confirmationBlocks: number;
-  } = {
-    delay: 10000,
-    maxBlocks: 10,
-    confirmationBlocks: 12,
-  };
+  options: Options = defaultIndexerOptions;
   ignoreDelay = false;
   chainId = -1;
   private eventEmitter: EventEmitter = new EventEmitter();
   private onEnd: (() => Promise<void>) | undefined;
 
-  constructor({ host, save, latestBlockNumber, filters = [], options = {} }: Constructor) {
-    this.websocketProvider = new Web3.providers.WebsocketProvider(host);
-    this.web3 = new Web3(this.websocketProvider);
+  constructor({ host, save, load, filters = [], options = {} }: Constructor) {
+    this.httpProvider = new Web3.providers.HttpProvider(host) as HttpProvider;
+    this.web3 = new Web3(this.httpProvider);
     this.save = save;
-    this.latestBlockNumber = latestBlockNumber;
+    this.load = load;
     this.filters = filters;
     this.options = { ...this.options, ...options };
     this.block = {
@@ -65,17 +59,21 @@ class Indexer {
     };
   }
 
-  async initialize(filters: Filter[]) {
-    this.setFilters(filters);
+  async initialize() {
     this.chainId = await this.web3.eth.getChainId();
+    this.filters = await this.load.filters();
+    this.options = await this.load.options();
     logger.info(`Chain Id: ${this.chainId}`);
+    logger.info(`Loaded filters: ${this.filters.length}`);
   }
 
-  setFilters(filters: Filter[]) {
+  async setFilters(filters: Filter[]) {
+    await this.save.filters(filters);
     this.filters = filters;
   }
 
-  setOptions(options: { delay?: number; maxBlocks?: number; confirmationBlocks?: number }) {
+  async setOptions(options: Partial<Options>) {
+    await this.save.options(options);
     this.options = { ...this.options, ...options };
   }
 
@@ -100,7 +98,7 @@ class Indexer {
       this.block.from = this.block.to - this.options.maxBlocks;
     } else {
       this.block.to = (await this.web3.eth.getBlockNumber()) - this.options.confirmationBlocks;
-      this.block.from = (await this.latestBlockNumber.load()) + 1;
+      this.block.from = (await this.load.blockNumber()) + 1;
       if (this.block.to - this.block.from > this.options.maxBlocks) {
         logger.warn(
           `Max blocks number exceeded (${this.block.to - this.block.from} block), Iteration delay is ignored`,
@@ -217,10 +215,10 @@ class Indexer {
         );
       }
 
-      await this.save(logs);
+      await this.save.logs(logs);
       logger.info(`${logs.length} log saved`);
     }
-    await this.latestBlockNumber.save(this.block.to);
+    await this.save.blockNumber(this.block.to);
     logger.info(`Last processed block number (${this.block.to}) saved`);
     this.eventEmitter.emit('end');
   }
@@ -313,4 +311,4 @@ class Indexer {
 
 export default Indexer;
 
-export { Filter, FormattedFilter, DecodedLog };
+export { Filter, FormattedFilter, DecodedLog, defaultIndexerOptions };

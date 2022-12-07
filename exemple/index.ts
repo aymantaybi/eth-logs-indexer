@@ -1,37 +1,22 @@
 import * as dotenv from 'dotenv';
-
 dotenv.config();
-
 import { AbiItem } from 'web3-utils';
 import { MongoClient } from 'mongodb';
-import ABICoder from 'web3-eth-abi';
-import { decodeInputs } from 'eth-logs-decoder';
 import Indexer, { Filter } from '../src';
-import { DecodedLog } from '../src/interfaces';
-import { getFunctionInputWithoutSelector } from '../src/utils';
+import { DecodedLog, Load, Options, Save } from '../src/interfaces';
 
-interface Options {
-  delay: number;
-  maxBlocks: number;
-  confirmationBlocks: number;
-}
+const { HTTP_PROVIDER_HOST, MONGODB_URI } = process.env;
 
-interface Save {
-  logs: (logs: DecodedLog[]) => Promise<void>;
-  filters: (filters: Filter[]) => Promise<void>;
-  options: (options: Options) => Promise<void>;
-  blockNumber: (blockNumber: number) => Promise<void>;
-}
-
-interface Load {
-  filters: () => Promise<Filter[]>;
-  options: () => Promise<Options>;
-  blockNumber: () => Promise<number>;
-}
-
-const { WEBSOCKET_PROVIDER_HOST, MONGODB_URI } = process.env;
+const host = HTTP_PROVIDER_HOST!;
 
 const mongoClient = new MongoClient(MONGODB_URI!);
+
+const indexerDatabase = mongoClient.db('eth-logs-indexer');
+
+const logsCollection = indexerDatabase.collection<DecodedLog>('logs');
+const filtersCollection = indexerDatabase.collection<any>('filters');
+const optionsCollection = indexerDatabase.collection<{ chainId: number; options: Options }>('options');
+const blockNumberCollection = indexerDatabase.collection<{ chainId: number; blockNumber: number }>('blockNumber');
 
 const eventsJsonInterfaces: { [eventName: string]: AbiItem } = {
   OrderMatched: {
@@ -343,34 +328,6 @@ const functionsJsonInterfaces: { [functionName: string]: AbiItem } = {
   },
 };
 
-const host = WEBSOCKET_PROVIDER_HOST!;
-
-/*   {
-    address: "0xfff9ce5f71ca6178d3beecedb61e7eff1602950e",
-    jsonInterface: {
-      event: OrderMatchedEventInterface,
-    },
-  }, 
-  {
-    address: '0x32950db2a7164ae833121501c797d79e7b79d74c',
-    jsonInterface: {
-      event: AxieggSpawnedEventInterface,
-    },
-  },
-  {
-    address: '0x32950db2a7164ae833121501c797d79e7b79d74c',
-    jsonInterface: {
-      event: AxieSpawnEventInterface,
-    },
-  },
-  {
-    address: '0x32950db2a7164ae833121501c797d79e7b79d74c',
-    jsonInterface: {
-      event: AxieBreedCountUpdatedEventInterface,
-    },
-  },
-  */
-
 const filters: Filter[] = [
   {
     id: '1',
@@ -389,156 +346,63 @@ const filters: Filter[] = [
   },
 ];
 
-const save = async (logs: DecodedLog[]) => {
-  //console.log(JSON.stringify(logs, null, 4));
-  const settleOrderFunctionSignature = ABICoder.encodeFunctionSignature(functionsJsonInterfaces.settleOrder);
-  for (const log of logs) {
-    if (log.function?.name == 'interactWith') {
-      const { _interface, _data } = log.function?.inputs as { _interface: string; _data: string };
-      if (_interface == 'ORDER_EXCHANGE' && _data.startsWith(settleOrderFunctionSignature)) {
-        const functionInputWithoutSelector = getFunctionInputWithoutSelector(_data);
-        const decodedInputs = decodeInputs(functionInputWithoutSelector, functionsJsonInterfaces.settleOrder.inputs!);
-        //console.log(JSON.stringify(decodedInputs, null, 4));
-      }
+const save: Save = {
+  async logs(logs: DecodedLog[]) {
+    await logsCollection.insertMany(logs);
+  },
+  async filters(filters: Filter[]) {
+    const chainId = indexer.chainId;
+    const oldFilters = indexer.filters;
+    const newFilters = filters.map((item) => ({ ...item, chainId }));
+    if (oldFilters.length > newFilters.length) {
+      const newFiltersIds = newFilters.map((newFilter) => newFilter.id);
+      const removedFilters = oldFilters.filter((oldFilter) => !newFiltersIds.includes(oldFilter.id));
+      const removedFiltersIds = removedFilters.map((removedFilter) => removedFilter.id);
+      await filtersCollection.deleteMany({ id: { $in: removedFiltersIds } });
+    } else if (oldFilters.length < newFilters.length) {
+      const oldFiltersIds = oldFilters.map((oldFilter) => oldFilter.id);
+      const addedFilters = newFilters.filter((newFilter) => !oldFiltersIds.includes(newFilter.id));
+      await filtersCollection.insertMany(addedFilters);
     }
-  }
-  await mongoClient.db('SmartLogs').collection('chainId:2020').insertMany(logs);
-};
-
-const latestBlockNumber = {
-  load: async () => {
-    const document = await mongoClient
-      .db('SmartLogs')
-      .collection('latestBlockNumber')
-      .findOne({ chainId: 2020 } as { chainId: number; blockNumber: number });
-    const blockNumber = document?.blockNumber ?? 0;
-    return blockNumber;
   },
-  save: async (blockNumber: number) => {
-    await mongoClient
-      .db('SmartLogs')
-      .collection('latestBlockNumber')
-      .updateOne({ chainId: 2020 }, { $set: { blockNumber: blockNumber } });
+  async options(options: Partial<Options>) {
+    const chainId = indexer.chainId;
+    await optionsCollection.updateOne(
+      { chainId },
+      { $set: { chainId, options: { ...indexer.options, ...options } } },
+      { upsert: true },
+    );
+  },
+  async blockNumber(blockNumber: number) {
+    const chainId = indexer.chainId;
+    await blockNumberCollection.updateOne({ chainId }, { $set: { chainId, blockNumber } }, { upsert: true });
   },
 };
 
-const indexer = new Indexer({
-  host,
-  save,
-  latestBlockNumber,
-});
+const load: Load = {
+  async filters() {
+    const chainId = indexer.chainId;
+    const documents = await filtersCollection.find({ chainId }).toArray();
+    return documents;
+  },
+  async options() {
+    const chainId = indexer.chainId;
+    const document = await optionsCollection.findOne({ chainId });
+    return document?.options || indexer.options;
+  },
+  async blockNumber() {
+    const chainId = indexer.chainId;
+    const document = await blockNumberCollection.findOne({ chainId });
+    return document?.blockNumber || 0;
+  },
+};
+
+const indexer = new Indexer({ host, load, save });
 
 (async () => {
   await mongoClient.connect();
-  await indexer.initialize(filters);
-
-  const filter: Filter = {
-    address: '0xa8754b9fa15fc18bb59458815510e40a12cd2014',
-    jsonInterface: {
-      event: {
-        anonymous: false,
-        name: 'Transfer',
-        type: 'event',
-        inputs: [
-          {
-            indexed: true,
-            name: 'from',
-            type: 'address',
-          },
-          {
-            indexed: true,
-            name: 'to',
-            type: 'address',
-          },
-          {
-            indexed: false,
-            name: 'value',
-            type: 'uint256',
-          },
-        ],
-      },
-      function: {
-        anonymous: false,
-        name: 'withdraw',
-        type: 'function',
-        inputs: [
-          {
-            indexed: false,
-            name: '_withdrawal',
-            type: 'tuple',
-            components: [
-              {
-                name: 'owner',
-                type: 'address',
-              },
-              {
-                name: 'nonce',
-                type: 'uint256',
-              },
-              {
-                name: 'expiredAt',
-                type: 'uint256',
-              },
-              {
-                name: 'assets',
-                type: 'tuple[]',
-                components: [
-                  {
-                    name: 'erc',
-                    type: 'uint8',
-                  },
-                  {
-                    name: 'addr',
-                    type: 'address',
-                  },
-                  {
-                    name: 'id',
-                    type: 'uint256',
-                  },
-                  {
-                    name: 'quantity',
-                    type: 'uint256',
-                  },
-                  {
-                    name: 'rarity',
-                    type: 'uint8',
-                  },
-                ],
-              },
-              {
-                name: 'extraData',
-                type: 'bytes',
-              },
-            ],
-          },
-          {
-            indexed: false,
-            name: '_signature',
-            type: 'bytes',
-          },
-          {
-            indexed: false,
-            name: '_path',
-            type: 'address[]',
-          },
-        ],
-      },
-    },
-    chainId: 2020,
-    options: {
-      include: {
-        transaction: ['hash', 'from', 'transactionIndex', 'blockNumber'],
-      },
-    },
-    id: '',
-  };
-
-  const preview = await indexer.previewLogs(
-    filter,
-    '0xa4b9bb8eb15d2de5d3f3657703065544fc20c758f1f37d4949e4aef35908ae33',
-  );
-
-  console.log(JSON.stringify(preview, null, 2));
-
-  //indexer.start(17610652);
+  await indexer.initialize();
+  await indexer.setOptions({ maxBlocks: 100 });
+  //await indexer.setFilters(filters);
+  await indexer.start();
 })();
