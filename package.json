@@ -23,7 +23,7 @@
   },
   "name": "eth-logs-indexer",
   "description": "Core module for EVM compatible blockchains smart contracts events logs indexing",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "main": "dist/index.js",
   "files": [
     "/dist"
