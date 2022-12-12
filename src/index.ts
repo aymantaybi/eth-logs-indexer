@@ -122,19 +122,11 @@ class Indexer {
     });
 
     if (pastLogs.length) {
-      const getTransaction: any = this.web3.eth.getTransaction;
-
-      const batch: any = new this.web3.BatchRequest();
       const logs: DecodedLog[] = [];
 
-      for (const pastLog of pastLogs) {
-        const { transactionHash } = pastLog;
-        const test = (request: any) => request.params[0] == transactionHash;
-        if (batch.requests.some(test)) continue;
-        batch.add(getTransaction.request(transactionHash));
-      }
-
-      const transactions: Transaction[] = await executeAsync(batch);
+      const transactions: Transaction[] = await this.getTransactionsFromHashes(
+        pastLogs.map((pastLog) => pastLog.transactionHash),
+      );
 
       for (const formattedFilter of formattedFilters) {
         const filteredPastLogs = pastLogs.filter(
@@ -221,6 +213,17 @@ class Indexer {
     await this.save.blockNumber(this.block.to);
     logger.info(`Last processed block number (${this.block.to}) saved`);
     this.eventEmitter.emit('end');
+  }
+
+  async getTransactionsFromHashes(hashes: string[]) {
+    const getTransaction: any = this.web3.eth.getTransaction;
+    const batch: any = new this.web3.BatchRequest();
+    const uniqueHashes = Array.from(new Set(hashes));
+    for (const transactionHash of uniqueHashes) {
+      batch.add(getTransaction.request(transactionHash));
+    }
+    const transactions: Transaction[] = await executeAsync(batch);
+    return transactions;
   }
 
   async start(blockNumber?: number) {
