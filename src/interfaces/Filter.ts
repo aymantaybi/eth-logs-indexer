@@ -12,6 +12,7 @@ interface Filter {
   options?: {
     include?: {
       transaction?: boolean | string[];
+      block?: boolean | string[];
     };
   };
 }

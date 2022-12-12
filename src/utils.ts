@@ -5,6 +5,7 @@ import { decodeInputs } from 'eth-logs-decoder';
 import { AbiItem } from 'web3-utils';
 import { DecodedLog, Filter, FormattedFilter } from './interfaces';
 import { EventEmitter } from 'events';
+import { BlockTransactionString } from 'web3-eth';
 
 function formatFilters(filters: Filter[]): FormattedFilter[] {
   return filters.map((filter) => {
@@ -50,7 +51,7 @@ function getFunctionInputWithoutSelector(input: string) {
   return '0x' + input.slice(10);
 }
 
-function addFunctionFieldToLogObject(
+function logWithFunctionObject(
   logObject: Partial<DecodedLog>,
   transaction: Transaction | undefined,
   functionJsonInterface: AbiItem | undefined,
@@ -81,7 +82,7 @@ function addFunctionFieldToLogObject(
   };
 }
 
-function addTransactionFieldsToLogObject(
+function logWithTransactionObject(
   logObject: Partial<DecodedLog>,
   transaction: Transaction | undefined,
   fields: string[] | boolean | undefined,
@@ -93,6 +94,21 @@ function addTransactionFieldsToLogObject(
   return {
     ...logObject,
     transaction: transactionWithFieds,
+  };
+}
+
+function logWithBlockObject(
+  logObject: Partial<DecodedLog>,
+  block: BlockTransactionString | undefined,
+  fields: string[] | boolean | undefined,
+): Partial<DecodedLog> {
+  if (!block || !fields) return logObject;
+
+  const blockWithFields = Array.isArray(fields) ? withFields(block, fields) : block;
+
+  return {
+    ...logObject,
+    block: blockWithFields,
   };
 }
 
@@ -122,7 +138,8 @@ export {
   sleep,
   withFields,
   getFunctionInputWithoutSelector,
-  addTransactionFieldsToLogObject,
-  addFunctionFieldToLogObject,
+  logWithTransactionObject,
+  logWithFunctionObject,
+  logWithBlockObject,
   waitForEvent,
 };

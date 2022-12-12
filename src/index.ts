@@ -2,22 +2,22 @@ import Web3 from 'web3';
 import ABICoder from 'web3-eth-abi';
 import { Transaction } from 'web3-core';
 import { HttpProvider } from 'web3-providers-http';
-import { decodeInputs, decodeLog } from 'eth-logs-decoder';
+import { decodeLog } from 'eth-logs-decoder';
 import { Filter, FormattedFilter, DecodedLog, Save, Load, Options } from './interfaces';
 import {
   formatFilters,
   getAddressAndTopicsOptions,
   sleep,
-  withFields,
-  getFunctionInputWithoutSelector,
-  addFunctionFieldToLogObject,
-  addTransactionFieldsToLogObject,
+  logWithFunctionObject,
+  logWithTransactionObject,
   waitForEvent,
+  logWithBlockObject,
 } from './utils';
 import logger from './helpers/logger';
 import { executeAsync } from './helpers/asyncBatch';
 import RawLog from './interfaces/RawLog';
 import { EventEmitter } from 'events';
+import { BlockTransactionString } from 'web3-eth';
 
 interface Constructor {
   host: string;
@@ -77,7 +77,7 @@ class Indexer {
     this.options = { ...this.options, ...options };
   }
 
-  async main(blockNumber?: number) {
+  private async main(blockNumber?: number) {
     if (!this.filters.length) {
       logger.error('No initialized  filters !');
       return this.stop();
@@ -128,6 +128,10 @@ class Indexer {
         pastLogs.map((pastLog) => pastLog.transactionHash),
       );
 
+      const blocks: BlockTransactionString[] = await this.getBlocksFromNumbers(
+        pastLogs.map((pastLog) => pastLog.blockNumber),
+      );
+
       for (const formattedFilter of formattedFilters) {
         const filteredPastLogs = pastLogs.filter(
           (pastLog) =>
@@ -147,45 +151,18 @@ class Indexer {
 
           const baseLog = decodeLog(pastLog, [eventJsonInterface]);
 
-          let decodedLog: DecodedLog = { ...baseLog, filterId, logIndex };
+          const block = blocks.find((item) => item.number == pastLog.blockNumber);
 
           const transaction = transactions.find((transaction) => transaction.hash == transactionHash);
 
-          if (transaction && functionJsonInterface?.inputs) {
-            const functionSignature = ABICoder.encodeFunctionSignature(functionJsonInterface);
-
-            const functionInputWithoutSelector = getFunctionInputWithoutSelector(transaction.input);
-
-            const inputs: any = transaction.input.startsWith(functionSignature)
-              ? decodeInputs(functionInputWithoutSelector, functionJsonInterface.inputs)
-              : {};
-
-            const signature = transaction.input.startsWith(functionSignature)
-              ? functionSignature
-              : transaction.input.slice(0, 10);
-
-            const name = transaction.input.startsWith(functionSignature) ? functionJsonInterface.name : null;
-
-            decodedLog = {
-              ...decodedLog,
-              function: {
-                signature,
-                name,
-                inputs,
-              },
-            };
-          }
-
-          if (transaction && formattedFilter.options?.include?.transaction) {
-            const fields = Array.isArray(formattedFilter.options?.include?.transaction)
-              ? formattedFilter.options?.include?.transaction
-              : Object.keys(transaction);
-
-            decodedLog = {
-              ...decodedLog,
-              transaction: withFields(transaction, fields),
-            };
-          }
+          const decodedLog: DecodedLog = {
+            ...baseLog,
+            ...logWithFunctionObject(baseLog, transaction, functionJsonInterface),
+            ...logWithTransactionObject(baseLog, transaction, formattedFilter.options?.include?.transaction),
+            ...logWithBlockObject(baseLog, block, formattedFilter.options?.include?.block),
+            filterId,
+            logIndex,
+          };
 
           return decodedLog;
         });
@@ -215,7 +192,7 @@ class Indexer {
     this.eventEmitter.emit('end');
   }
 
-  async getTransactionsFromHashes(hashes: string[]) {
+  private async getTransactionsFromHashes(hashes: string[]) {
     const getTransaction: any = this.web3.eth.getTransaction;
     const batch: any = new this.web3.BatchRequest();
     const uniqueHashes = Array.from(new Set(hashes));
@@ -224,6 +201,17 @@ class Indexer {
     }
     const transactions: Transaction[] = await executeAsync(batch);
     return transactions;
+  }
+
+  private async getBlocksFromNumbers(numbers: number[]) {
+    const getBlock: any = this.web3.eth.getBlock;
+    const batch: any = new this.web3.BatchRequest();
+    const uniqueNumbers = Array.from(new Set(numbers));
+    for (const blockNumber of uniqueNumbers) {
+      batch.add(getBlock.request(blockNumber));
+    }
+    const blocks: BlockTransactionString[] = await executeAsync(batch);
+    return blocks;
   }
 
   async start(blockNumber?: number) {
@@ -274,17 +262,20 @@ class Indexer {
   async previewLogs(filter: Filter, transactionHash: string) {
     const getTransactionReceipt = this.web3.eth.getTransactionReceipt;
     const getTransaction = this.web3.eth.getTransaction;
+    const getBlock = this.web3.eth.getBlock;
 
     const filterAddress = filter.address.toLowerCase();
     const filterEventJsonInterface = filter.jsonInterface.event;
     const filterEventSignature = ABICoder.encodeEventSignature(filterEventJsonInterface);
     const filterFunctionJsonInterface = filter.jsonInterface.function;
     const filterTransactionIncludes = filter.options?.include?.transaction;
+    const filterBlockIncludes = filter.options?.include?.block;
 
     const functionInputsOrTransactionIncludes = filterFunctionJsonInterface?.inputs || filterTransactionIncludes;
 
     const transaction = functionInputsOrTransactionIncludes ? await getTransaction(transactionHash) : undefined;
     const transactionReceipt = await getTransactionReceipt(transactionHash);
+    const block = filterBlockIncludes ? await getBlock(transactionReceipt.blockNumber) : undefined;
 
     const logs = transactionReceipt.logs.filter(
       (receiptLog) =>
@@ -300,8 +291,9 @@ class Indexer {
       const { logIndex } = log;
       const decodedLog: DecodedLog = {
         ...rawLog,
-        ...addFunctionFieldToLogObject(rawLog, transaction, filterFunctionJsonInterface),
-        ...addTransactionFieldsToLogObject(rawLog, transaction, filterTransactionIncludes),
+        ...logWithFunctionObject(rawLog, transaction, filterFunctionJsonInterface),
+        ...logWithTransactionObject(rawLog, transaction, filterTransactionIncludes),
+        ...logWithBlockObject(rawLog, block, filterBlockIncludes),
         logIndex,
         filterId: '',
       };

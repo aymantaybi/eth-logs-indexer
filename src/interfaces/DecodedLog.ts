@@ -1,3 +1,5 @@
+import { BlockTransactionString } from 'web3-eth';
+
 interface DecodedLog {
   filterId: string;
   address: string;
@@ -26,6 +28,7 @@ interface DecodedLog {
     gas?: number;
     input?: string;
   };
+  block?: Partial<BlockTransactionString>;
   logIndex: number;
 }
 
