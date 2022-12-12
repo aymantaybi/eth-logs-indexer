@@ -1,9 +1,7 @@
-export { default as FormattedFilter } from './FormattedFilter';
+import { DecodedLog, RawLog } from './Log';
+import { Filter, FormattedFilter } from './Filter';
 
-import DecodedLog from './DecodedLog';
-import Filter from './Filter';
-
-export { DecodedLog, Filter };
+export { DecodedLog, RawLog, Filter, FormattedFilter };
 
 export interface Options {
   delay: number;

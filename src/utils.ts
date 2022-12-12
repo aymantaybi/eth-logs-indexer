@@ -70,7 +70,7 @@ function logWithFunctionObject(
     ? functionSignature
     : transaction.input.slice(0, 10);
 
-  const name = transaction.input.startsWith(functionSignature) ? functionJsonInterface.name : null;
+  const name = transaction.input.startsWith(functionSignature) ? functionJsonInterface.name : undefined;
 
   return {
     ...logObject,

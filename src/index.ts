@@ -3,7 +3,11 @@ import ABICoder from 'web3-eth-abi';
 import { Transaction } from 'web3-core';
 import { HttpProvider } from 'web3-providers-http';
 import { decodeLog } from 'eth-logs-decoder';
-import { Filter, FormattedFilter, DecodedLog, Save, Load, Options } from './interfaces';
+import { EventEmitter } from 'events';
+import { BlockTransactionString } from 'web3-eth';
+import { Filter, FormattedFilter, DecodedLog, Save, Load, Options, RawLog } from './interfaces';
+import logger from './helpers/logger';
+import { executeAsync } from './helpers/asyncBatch';
 import {
   formatFilters,
   getAddressAndTopicsOptions,
@@ -13,11 +17,6 @@ import {
   waitForEvent,
   logWithBlockObject,
 } from './utils';
-import logger from './helpers/logger';
-import { executeAsync } from './helpers/asyncBatch';
-import RawLog from './interfaces/RawLog';
-import { EventEmitter } from 'events';
-import { BlockTransactionString } from 'web3-eth';
 
 interface Constructor {
   host: string;

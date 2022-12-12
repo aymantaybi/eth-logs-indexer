@@ -1,6 +1,6 @@
 import { AbiItem } from 'web3-utils';
 
-interface Filter {
+export interface Filter {
   id: string;
   tag?: string;
   chainId?: number;
@@ -17,4 +17,6 @@ interface Filter {
   };
 }
 
-export default Filter;
+export interface FormattedFilter extends Filter {
+  eventSignature: string;
+}
