@@ -92,23 +92,27 @@ class Indexer {
 
     this.ignoreDelay = false;
 
+    const currentBlockNumber = await this.web3.eth.getBlockNumber();
+    const latestBlockNumber = await this.load.blockNumber();
+
     if (blockNumber) {
-      this.block.to = blockNumber;
-      this.block.from = this.block.to - this.options.maxBlocks;
+      this.block.from = blockNumber;
+      this.block.to = Math.min(currentBlockNumber, this.block.from + this.options.maxBlocks);
     } else {
-      this.block.to = (await this.web3.eth.getBlockNumber()) - this.options.confirmationBlocks;
-      this.block.from = (await this.load.blockNumber()) + 1;
-      if (this.block.to - this.block.from > this.options.maxBlocks) {
-        logger.warn(
-          `Max blocks number exceeded (${this.block.to - this.block.from} block), Iteration delay is ignored`,
-        );
-        this.ignoreDelay = true;
-        this.block.to = this.block.from + this.options.maxBlocks;
-      } else if (this.block.to - this.block.from < 0) {
-        this.eventEmitter.emit('end');
-        logger.error(`Block number "from" ${this.block.from}  is higher than Block number "to" ${this.block.to}`);
-        return;
-      }
+      this.block.from = latestBlockNumber + 1;
+      this.block.to = currentBlockNumber - this.options.confirmationBlocks;
+    }
+
+    if (this.block.to - this.block.from > this.options.maxBlocks) {
+      logger.warn(`Max blocks number exceeded (${this.block.to - this.block.from} block), Iteration delay is ignored`);
+      this.ignoreDelay = true;
+      this.block.to = this.block.from + this.options.maxBlocks;
+    } else if (this.block.to - this.block.from <= 0) {
+      logger.error(`Block number "from" ${this.block.from} >= Block number "to" ${this.block.to}`);
+      await this.save.blockNumber(this.block.from - 1);
+      logger.warn(`Waiting for new blocks ...`);
+      this.eventEmitter.emit('end');
+      return;
     }
 
     logger.info(`Processing logs from block ${this.block.from} to block ${this.block.to}`);
