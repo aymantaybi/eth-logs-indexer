@@ -248,17 +248,17 @@ class Indexer {
   status() {
     const chainId = this.chainId;
     const isRunning = this.isRunning();
-    const blockNumber = this.block.from;
+    const blockNumber = this.block.to;
     const filters = this.filters.length || 0;
     const options = this.options;
     return { chainId, isRunning, blockNumber, filters, options };
   }
 
-  onIterationBegin(callback: () => any) {
+  onIterationBegin(callback: () => void) {
     this.eventEmitter.on('begin', callback);
   }
 
-  onIterationEnd(callback: () => any) {
+  onIterationEnd(callback: () => void) {
     this.eventEmitter.on('end', callback);
   }
 
