@@ -44,6 +44,7 @@ class Indexer {
   chainId = -1;
   private eventEmitter: EventEmitter = new EventEmitter();
   private onEnd: (() => Promise<void>) | undefined;
+  private latestBlockNumber = 0;
 
   constructor({ host, save, load, filters = [], options = {} }: Constructor) {
     this.httpProvider = new Web3.providers.HttpProvider(host) as HttpProvider;
@@ -62,8 +63,10 @@ class Indexer {
     this.chainId = await this.web3.eth.getChainId();
     this.filters = await this.load.filters();
     this.options = await this.load.options();
-    logger.info(`Chain Id: ${this.chainId}`);
+    this.latestBlockNumber = await this.load.blockNumber();
+    logger.info(`Chain id: ${this.chainId}`);
     logger.info(`Loaded filters: ${this.filters.length}`);
+    logger.info(`Loaded latest block number : ${this.latestBlockNumber}`);
   }
 
   async setFilters(filters: Filter[]) {
@@ -82,7 +85,7 @@ class Indexer {
       return this.stop();
     }
 
-    if (this.chainId == -1) logger.warn(`Unknown Chain Id : ${this.chainId}`);
+    if (this.chainId == -1) logger.warn(`Unknown chain id : ${this.chainId}`);
 
     this.eventEmitter.emit('begin');
 
@@ -93,13 +96,12 @@ class Indexer {
     this.ignoreDelay = false;
 
     const currentBlockNumber = await this.web3.eth.getBlockNumber();
-    const latestBlockNumber = await this.load.blockNumber();
 
     if (blockNumber) {
       this.block.from = blockNumber;
       this.block.to = Math.min(currentBlockNumber, this.block.from + this.options.maxBlocks);
     } else {
-      this.block.from = latestBlockNumber + 1;
+      this.block.from = this.latestBlockNumber + 1;
       this.block.to = currentBlockNumber - this.options.confirmationBlocks;
     }
 
@@ -108,8 +110,8 @@ class Indexer {
       this.ignoreDelay = true;
       this.block.to = this.block.from + this.options.maxBlocks;
     } else if (this.block.to - this.block.from <= 0) {
-      logger.error(`Block number "from" ${this.block.from} >= Block number "to" ${this.block.to}`);
-      await this.save.blockNumber(this.block.from - 1);
+      logger.error(`Block number "from" ${this.block.from} >= block number "to" ${this.block.to}`);
+      this.latestBlockNumber = this.block.from - 1;
       logger.warn(`Waiting for new blocks ...`);
       this.eventEmitter.emit('end');
       return;
@@ -190,8 +192,10 @@ class Indexer {
       await this.save.logs(logs);
       logger.info(`${logs.length} log saved`);
     }
-    await this.save.blockNumber(this.block.to);
-    logger.info(`Last processed block number (${this.block.to}) saved`);
+
+    this.latestBlockNumber = this.block.to;
+    await this.save.blockNumber(this.latestBlockNumber);
+    logger.info(`Last processed block number (${this.latestBlockNumber}) saved`);
     this.eventEmitter.emit('end');
   }
 
