@@ -252,7 +252,7 @@ class Indexer {
   status() {
     const chainId = this.chainId;
     const isRunning = this.isRunning();
-    const blockNumber = this.block.to;
+    const blockNumber = this.latestBlockNumber;
     const filters = this.filters.length || 0;
     const options = this.options;
     return { chainId, isRunning, blockNumber, filters, options };
