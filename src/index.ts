@@ -66,7 +66,7 @@ class Indexer {
     this.latestBlockNumber = await this.load.blockNumber();
     logger.info(`Chain id: ${this.chainId}`);
     logger.info(`Loaded filters: ${this.filters.length}`);
-    logger.info(`Loaded latest block number : ${this.latestBlockNumber}`);
+    logger.info(`Loaded latest block number: ${this.latestBlockNumber}`);
   }
 
   async setFilters(filters: Filter[]) {
