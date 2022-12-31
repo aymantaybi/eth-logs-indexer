@@ -2,8 +2,9 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 import { AbiItem } from 'web3-utils';
 import { MongoClient } from 'mongodb';
-import Indexer, { Filter } from '../src';
-import { DecodedLog, Load, Options, Save } from '../src/interfaces';
+import Indexer from '../src';
+import { Filter } from '../src/interfaces';
+import { Log, Load, Options, Save } from '../src/interfaces';
 
 const { HTTP_PROVIDER_HOST, MONGODB_URI } = process.env;
 
@@ -13,7 +14,7 @@ const mongoClient = new MongoClient(MONGODB_URI!);
 
 const indexerDatabase = mongoClient.db('eth-logs-indexer');
 
-const logsCollection = indexerDatabase.collection<DecodedLog>('logs');
+const logsCollection = indexerDatabase.collection<Log>('logs');
 const filtersCollection = indexerDatabase.collection<any>('filters');
 const optionsCollection = indexerDatabase.collection<{ chainId: number; options: Options }>('options');
 const blockNumberCollection = indexerDatabase.collection<{ chainId: number; blockNumber: number }>('blockNumber');
@@ -347,7 +348,7 @@ const filters: Filter[] = [
 ];
 
 const save: Save = {
-  async logs(logs: DecodedLog[]) {
+  async logs(logs: Log[]) {
     await logsCollection.insertMany(logs);
   },
   async filters(filters: Filter[]) {
