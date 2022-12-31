@@ -12,10 +12,10 @@ import {
   formatFilters,
   getAddressAndTopicsOptions,
   sleep,
-  logWithFunctionObject,
-  logWithTransactionObject,
+  logFunctionObject,
+  logTransactionObject,
   waitForEvent,
-  logWithBlockObject,
+  logBlockObject,
 } from './utils';
 
 const defaultIndexerOptions = {
@@ -33,7 +33,7 @@ class Indexer {
   block: { from: number; to: number };
   options: Options = defaultIndexerOptions;
   ignoreDelay = false;
-  chainId = -1;
+  chainId = 0;
   private eventEmitter: EventEmitter = new EventEmitter();
   private onEnd: (() => Promise<void>) | undefined;
   private latestBlockNumber = 0;
@@ -77,7 +77,10 @@ class Indexer {
       return this.stop();
     }
 
-    if (this.chainId == -1) logger.warn(`Unknown chain id : ${this.chainId}`);
+    if (!this.chainId) {
+      logger.error(`Unknown chain id : ${this.chainId}`);
+      return this.stop();
+    }
 
     this.eventEmitter.emit('begin');
 
@@ -152,13 +155,21 @@ class Indexer {
 
           const transaction = transactions.find((transaction) => transaction.hash == transactionHash);
 
+          const logFunction = logFunctionObject(transaction, functionJsonInterface);
+          const logBlock = logBlockObject(block, formattedFilter.options?.include?.block);
+          const logTransaction = logTransactionObject(transaction, formattedFilter.options?.include?.transaction);
+
           const log: Log = {
-            ...baseLog,
-            ...logWithFunctionObject(baseLog, transaction, functionJsonInterface),
-            ...logWithTransactionObject(baseLog, transaction, formattedFilter.options?.include?.transaction),
-            ...logWithBlockObject(baseLog, block, formattedFilter.options?.include?.block),
             filterId,
             logIndex,
+            ...baseLog,
+            ...logFunction,
+            ...logBlock,
+            transaction: {
+              ...logTransaction,
+              transactionIndex: pastLog.transactionIndex,
+              blockNumber: pastLog.blockNumber,
+            },
           };
 
           return log;
@@ -175,8 +186,8 @@ class Indexer {
       ) {
         logs.sort(
           (a, b) =>
-            a.transaction!.blockNumber! - b.transaction!.blockNumber! ||
-            a.transaction!.transactionIndex! - b.transaction!.transactionIndex! ||
+            a.transaction.blockNumber - b.transaction.blockNumber ||
+            a.transaction.transactionIndex - b.transaction.transactionIndex ||
             a.logIndex - b.logIndex,
         );
       }
@@ -288,13 +299,22 @@ class Indexer {
     for (const receiptLog of receiptLogs) {
       const baseLog: BaseLog = decodeLog(receiptLog, [filterEventJsonInterface]);
       const { logIndex } = receiptLog;
+
+      const logFunction = logFunctionObject(transaction, filterFunctionJsonInterface);
+      const logBlock = logBlockObject(block, filterBlockIncludes);
+      const logTransaction = logTransactionObject(transaction, filterTransactionIncludes);
+
       const log: Log = {
-        ...baseLog,
-        ...logWithFunctionObject(baseLog, transaction, filterFunctionJsonInterface),
-        ...logWithTransactionObject(baseLog, transaction, filterTransactionIncludes),
-        ...logWithBlockObject(baseLog, block, filterBlockIncludes),
-        logIndex,
         filterId: '',
+        logIndex,
+        ...baseLog,
+        ...logFunction,
+        ...logBlock,
+        transaction: {
+          ...logTransaction,
+          transactionIndex: receiptLog.transactionIndex,
+          blockNumber: receiptLog.blockNumber,
+        },
       };
       previews.push(log);
     }

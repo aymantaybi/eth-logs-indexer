@@ -12,7 +12,10 @@ export interface BaseLog {
 
 export interface Log extends BaseLog {
   function?: BaseLog['event'];
-  transaction?: Partial<Transaction>;
+  transaction: Partial<Transaction> & {
+    transactionIndex: number;
+    blockNumber: number;
+  };
   block?: Partial<BlockTransactionString>;
   filterId: string;
   logIndex: number;

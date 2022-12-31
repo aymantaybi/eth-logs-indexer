@@ -3,7 +3,7 @@ import ABICoder from 'web3-eth-abi';
 import { Transaction } from 'web3-core';
 import { decodeInputs } from 'eth-logs-decoder';
 import { AbiItem } from 'web3-utils';
-import { DecodedLog, Filter, FormattedFilter } from './interfaces';
+import { Log, Filter, FormattedFilter } from './interfaces';
 import { EventEmitter } from 'events';
 import { BlockTransactionString } from 'web3-eth';
 
@@ -51,12 +51,11 @@ function getFunctionInputWithoutSelector(input: string) {
   return '0x' + input.slice(10);
 }
 
-function logWithFunctionObject(
-  logObject: Partial<DecodedLog>,
+function logFunctionObject(
   transaction: Transaction | undefined,
   functionJsonInterface: AbiItem | undefined,
-): Partial<DecodedLog> {
-  if (!transaction || !functionJsonInterface?.inputs) return logObject;
+): Log['function'] | undefined {
+  if (!transaction || !functionJsonInterface?.inputs) return undefined;
 
   const functionSignature = ABICoder.encodeFunctionSignature(functionJsonInterface);
 
@@ -73,43 +72,34 @@ function logWithFunctionObject(
   const name = transaction.input.startsWith(functionSignature) ? functionJsonInterface.name : undefined;
 
   return {
-    ...logObject,
-    function: {
-      signature,
-      name,
-      inputs,
-    },
+    signature,
+    name,
+    inputs,
   };
 }
 
-function logWithTransactionObject(
-  logObject: Partial<DecodedLog>,
+function logTransactionObject(
   transaction: Transaction | undefined,
   fields: string[] | boolean | undefined,
-): Partial<DecodedLog> {
-  if (!transaction || !fields) return logObject;
+): Log['transaction'] | undefined {
+  if (!transaction || !fields) return undefined;
 
-  const transactionWithFieds = Array.isArray(fields) ? withFields(transaction, fields) : transaction;
+  const transactionWithFileds = (
+    Array.isArray(fields) ? withFields(transaction, fields) : transaction
+  ) as Log['transaction'];
 
-  return {
-    ...logObject,
-    transaction: transactionWithFieds,
-  };
+  return transactionWithFileds;
 }
 
-function logWithBlockObject(
-  logObject: Partial<DecodedLog>,
+function logBlockObject(
   block: BlockTransactionString | undefined,
   fields: string[] | boolean | undefined,
-): Partial<DecodedLog> {
-  if (!block || !fields) return logObject;
+): Log['block'] | undefined {
+  if (!block || !fields) return undefined;
 
   const blockWithFields = Array.isArray(fields) ? withFields(block, fields) : block;
 
-  return {
-    ...logObject,
-    block: blockWithFields,
-  };
+  return blockWithFields;
 }
 
 function waitForEvent(
@@ -138,8 +128,8 @@ export {
   sleep,
   withFields,
   getFunctionInputWithoutSelector,
-  logWithTransactionObject,
-  logWithFunctionObject,
-  logWithBlockObject,
+  logTransactionObject,
+  logFunctionObject,
+  logBlockObject,
   waitForEvent,
 };
