@@ -5,7 +5,7 @@ import { HttpProvider } from 'web3-providers-http';
 import { decodeLog } from 'eth-logs-decoder';
 import { EventEmitter } from 'events';
 import { BlockTransactionString } from 'web3-eth';
-import { Filter, FormattedFilter, DecodedLog, Save, Load, Options, RawLog } from './interfaces';
+import { Filter, BaseLog, Log, Save, Load, Options, IndexerConstructor } from './interfaces';
 import logger from './helpers/logger';
 import { executeAsync } from './helpers/asyncBatch';
 import {
@@ -17,14 +17,6 @@ import {
   waitForEvent,
   logWithBlockObject,
 } from './utils';
-
-interface Constructor {
-  host: string;
-  save: Save;
-  load: Load;
-  filters?: Filter[];
-  options?: Partial<Options>;
-}
 
 const defaultIndexerOptions = {
   delay: 10000,
@@ -46,7 +38,7 @@ class Indexer {
   private onEnd: (() => Promise<void>) | undefined;
   private latestBlockNumber = 0;
 
-  constructor({ host, save, load, filters = [], options = {} }: Constructor) {
+  constructor({ host, save, load, filters = [], options = {} }: IndexerConstructor) {
     this.httpProvider = new Web3.providers.HttpProvider(host) as HttpProvider;
     this.web3 = new Web3(this.httpProvider);
     this.save = save;
@@ -127,7 +119,7 @@ class Indexer {
     });
 
     if (pastLogs.length) {
-      const logs: DecodedLog[] = [];
+      const logs: Log[] = [];
 
       const transactions: Transaction[] = await this.getTransactionsFromHashes(
         pastLogs.map((pastLog) => pastLog.transactionHash),
@@ -160,7 +152,7 @@ class Indexer {
 
           const transaction = transactions.find((transaction) => transaction.hash == transactionHash);
 
-          const decodedLog: DecodedLog = {
+          const log: Log = {
             ...baseLog,
             ...logWithFunctionObject(baseLog, transaction, functionJsonInterface),
             ...logWithTransactionObject(baseLog, transaction, formattedFilter.options?.include?.transaction),
@@ -169,7 +161,7 @@ class Indexer {
             logIndex,
           };
 
-          return decodedLog;
+          return log;
         });
 
         logs.push(...filterMatchingLogs);
@@ -284,27 +276,27 @@ class Indexer {
     const transactionReceipt = await getTransactionReceipt(transactionHash);
     const block = filterBlockIncludes ? await getBlock(transactionReceipt.blockNumber) : undefined;
 
-    const logs = transactionReceipt.logs.filter(
+    const receiptLogs = transactionReceipt.logs.filter(
       (receiptLog) =>
         receiptLog.address.toLowerCase() === filterAddress && receiptLog.topics[0] === filterEventSignature,
     );
 
-    if (!logs.length) throw new Error('No logs in the transaction receipt with the filter event signature');
+    if (!receiptLogs.length) throw new Error('No logs in the transaction receipt with the filter event signature');
 
-    const previews: DecodedLog[] = [];
+    const previews: Log[] = [];
 
-    for (const log of logs) {
-      const rawLog: RawLog = decodeLog(log, [filterEventJsonInterface]);
-      const { logIndex } = log;
-      const decodedLog: DecodedLog = {
-        ...rawLog,
-        ...logWithFunctionObject(rawLog, transaction, filterFunctionJsonInterface),
-        ...logWithTransactionObject(rawLog, transaction, filterTransactionIncludes),
-        ...logWithBlockObject(rawLog, block, filterBlockIncludes),
+    for (const receiptLog of receiptLogs) {
+      const baseLog: BaseLog = decodeLog(receiptLog, [filterEventJsonInterface]);
+      const { logIndex } = receiptLog;
+      const log: Log = {
+        ...baseLog,
+        ...logWithFunctionObject(baseLog, transaction, filterFunctionJsonInterface),
+        ...logWithTransactionObject(baseLog, transaction, filterTransactionIncludes),
+        ...logWithBlockObject(baseLog, block, filterBlockIncludes),
         logIndex,
         filterId: '',
       };
-      previews.push(decodedLog);
+      previews.push(log);
     }
 
     return previews;
@@ -313,4 +305,4 @@ class Indexer {
 
 export default Indexer;
 
-export { Filter, FormattedFilter, DecodedLog, defaultIndexerOptions };
+export { defaultIndexerOptions };

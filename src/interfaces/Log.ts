@@ -1,7 +1,7 @@
 import { BlockTransactionString } from 'web3-eth';
 import { Transaction } from 'web3-core';
 
-export interface RawLog {
+export interface BaseLog {
   address: string;
   event: {
     signature: string;
@@ -10,8 +10,8 @@ export interface RawLog {
   };
 }
 
-export interface DecodedLog extends RawLog {
-  function?: RawLog['event'];
+export interface Log extends BaseLog {
+  function?: BaseLog['event'];
   transaction?: Partial<Transaction>;
   block?: Partial<BlockTransactionString>;
   filterId: string;
