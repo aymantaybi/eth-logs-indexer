@@ -100,11 +100,13 @@ class Indexer {
       this.block.to = currentBlockNumber - this.options.confirmationBlocks;
     }
 
-    if (this.block.to - this.block.from > this.options.maxBlocks) {
-      logger.warn(`Max blocks number exceeded (${this.block.to - this.block.from} block), Iteration delay is ignored`);
+    const blocksDelta = this.block.to - this.block.from;
+
+    if (blocksDelta > this.options.maxBlocks) {
+      logger.warn(`Max blocks number exceeded (${blocksDelta} block), Iteration delay is ignored`);
       this.ignoreDelay = true;
       this.block.to = this.block.from + this.options.maxBlocks;
-    } else if (this.block.to - this.block.from <= 0) {
+    } else if (blocksDelta <= 0) {
       logger.error(`Block number "from" ${this.block.from} >= block number "to" ${this.block.to}`);
       this.latestBlockNumber = this.block.from - 1;
       logger.warn(`Waiting for new blocks ...`);
@@ -147,7 +149,7 @@ class Indexer {
         const { id: filterId } = formattedFilter;
 
         const filterMatchingLogs = filteredPastLogs.map((pastLog) => {
-          const { transactionHash, logIndex } = pastLog;
+          const { transactionHash, logIndex, transactionIndex, blockNumber } = pastLog;
 
           const baseLog = decodeLog(pastLog, [eventJsonInterface]);
 
@@ -167,8 +169,8 @@ class Indexer {
             ...logBlock,
             transaction: {
               ...logTransaction,
-              transactionIndex: pastLog.transactionIndex,
-              blockNumber: pastLog.blockNumber,
+              transactionIndex,
+              blockNumber,
             },
           };
 
@@ -298,7 +300,7 @@ class Indexer {
 
     for (const receiptLog of receiptLogs) {
       const baseLog: BaseLog = decodeLog(receiptLog, [filterEventJsonInterface]);
-      const { logIndex } = receiptLog;
+      const { logIndex, transactionIndex, blockNumber } = receiptLog;
 
       const logFunction = logFunctionObject(transaction, filterFunctionJsonInterface);
       const logBlock = logBlockObject(block, filterBlockIncludes);
@@ -312,8 +314,8 @@ class Indexer {
         ...logBlock,
         transaction: {
           ...logTransaction,
-          transactionIndex: receiptLog.transactionIndex,
-          blockNumber: receiptLog.blockNumber,
+          transactionIndex,
+          blockNumber,
         },
       };
       previews.push(log);
