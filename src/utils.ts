@@ -12,24 +12,14 @@ function formatFilters(filters: Filter[]): FormattedFilter[] {
     return {
       ...filter,
       address: Utils.toChecksumAddress(filter.address),
-      eventSignature: ABICoder.encodeEventSignature(filter.jsonInterface.event as any),
+      eventSignature: ABICoder.encodeEventSignature(filter.jsonInterface.event),
     };
   });
 }
 
 function getAddressAndTopicsOptions(formattedFilters: FormattedFilter[]) {
-  const address: string[] = [];
-  const topics: string[][] = [[]];
-
-  for (const filter of formattedFilters) {
-    if (!address.includes(filter.address)) {
-      address.push(filter.address);
-    }
-    if (!topics[0].includes(filter.eventSignature)) {
-      topics[0].push(filter.eventSignature);
-    }
-  }
-
+  const address: string[] = Array.from(new Set(formattedFilters.map((filter) => filter.address)));
+  const topics: string[][] = [Array.from(new Set(formattedFilters.map((filter) => filter.eventSignature)))];
   return { address, topics };
 }
 
@@ -105,15 +95,15 @@ function logBlockObject(
 function waitForEvent(
   eventEmitter: EventEmitter,
   eventName: string,
-  options = { timeout: 0, condition: (...args: any) => true },
+  options = { timeout: 0, condition: (args: any) => true },
 ) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const timeoutID = options.timeout
       ? setTimeout(() => {
           listener(undefined);
         }, options.timeout)
       : 0;
-    const listener = (data: any) => {
+    const listener = (data: unknown) => {
       if (options.condition && !options.condition(data)) return;
       if (options.timeout) clearTimeout(timeoutID);
       resolve(data);
