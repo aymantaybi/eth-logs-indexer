@@ -106,8 +106,8 @@ class Indexer {
       logger.warn(`Max blocks number exceeded (${blocksDelta} block), Iteration delay is ignored`);
       this.ignoreDelay = true;
       this.block.to = this.block.from + this.options.maxBlocks;
-    } else if (blocksDelta <= 0) {
-      logger.error(`Block number "from" ${this.block.from} >= block number "to" ${this.block.to}`);
+    } else if (blocksDelta < 0) {
+      logger.warn(`Block number "from" ${this.block.from} > block number "to" ${this.block.to}`);
       this.latestBlockNumber = this.block.from - 1;
       logger.warn(`Waiting for new blocks ...`);
       this.eventEmitter.emit('end');
