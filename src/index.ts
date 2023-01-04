@@ -165,8 +165,8 @@ class Indexer {
             filterId,
             logIndex,
             ...baseLog,
-            ...logFunction,
-            ...logBlock,
+            ...(logFunction ? { function: logFunction } : {}),
+            ...(logBlock ? { block: logBlock } : {}),
             transaction: {
               ...logTransaction,
               transactionIndex,
@@ -310,8 +310,8 @@ class Indexer {
         filterId: '',
         logIndex,
         ...baseLog,
-        ...logFunction,
-        ...logBlock,
+        ...(logFunction ? { function: logFunction } : {}),
+        ...(logBlock ? { block: logBlock } : {}),
         transaction: {
           ...logTransaction,
           transactionIndex,
