@@ -22,6 +22,7 @@ const defaultIndexerOptions = {
   delay: 10000,
   maxBlocks: 10,
   confirmationBlocks: 12,
+  autoStart: false,
 };
 
 class Indexer {
@@ -59,6 +60,9 @@ class Indexer {
     logger.info(`Chain id: ${this.chainId}`);
     logger.info(`Loaded filters: ${this.filters.length}`);
     logger.info(`Loaded latest block number: ${this.latestBlockNumber}`);
+    if (this.options.autoStart) {
+      this.start();
+    }
   }
 
   async setFilters(filters: Filter[]) {

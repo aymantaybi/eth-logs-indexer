@@ -7,6 +7,7 @@ export interface Options {
   delay: number;
   maxBlocks: number;
   confirmationBlocks: number;
+  autoStart: boolean;
 }
 
 export interface Save {
