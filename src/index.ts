@@ -127,6 +127,8 @@ class Indexer {
       toBlock: this.block.to,
     });
 
+    logger.debug(JSON.stringify(pastLogs, null, 2));
+
     if (pastLogs.length) {
       const logs: Log[] = [];
 
@@ -134,9 +136,13 @@ class Indexer {
         pastLogs.map((pastLog) => pastLog.transactionHash),
       );
 
+      logger.debug(JSON.stringify(transactions, null, 2));
+
       const blocks: BlockTransactionString[] = await this.getBlocksFromNumbers(
         pastLogs.map((pastLog) => pastLog.blockNumber),
       );
+
+      logger.debug(JSON.stringify(blocks, null, 2));
 
       for (const formattedFilter of formattedFilters) {
         const filteredPastLogs = pastLogs.filter(
