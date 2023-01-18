@@ -1,33 +1,38 @@
-const Jsonrpc = require('web3-core-requestmanager/src/jsonrpc');
+import Jsonrpc from 'web3-core-requestmanager/src/jsonrpc';
 
-var { errors } = require('web3-core-helpers');
+import { errors } from 'web3-core-helpers';
 
-function executeAsync(batch: any): any {
-  return new Promise((resolve, reject) => {
-    var requests = batch.requests;
-
-    batch.requestManager.sendBatch(requests, (err: any, results: never[]) => {
-      results = results || [];
-
-      var response = requests
-        .map((request: any, index: number) => {
+export function executeAsync(batch: any): any {
+  return new Promise((resolve) => {
+    const requests = batch.requests;
+    const sortResponses = batch._sortResponses.bind(batch);
+    const formattedResults: unknown[] = [];
+    batch.requestManager.sendBatch(requests, function (err, results) {
+      results = sortResponses(results);
+      requests
+        .map(function (request, index) {
           return results[index] || {};
         })
-        .map((result: { error: any; result: any }, index: number) => {
-          if (result && result.error) {
-            return errors.ErrorResponse(result);
+        .forEach(function (result, index) {
+          formattedResults.push(requests[index].format ? requests[index].format(result.result) : result.result);
+          if (requests[index].callback) {
+            if (result && result.error) {
+              return requests[index].callback(errors.ErrorResponse(result));
+            }
+            if (!Jsonrpc.isValidResponse(result)) {
+              return requests[index].callback(errors.InvalidResponse(result));
+            }
+            try {
+              requests[index].callback(
+                null,
+                requests[index].format ? requests[index].format(result.result) : result.result,
+              );
+            } catch (err) {
+              requests[index].callback(err);
+            }
           }
-
-          if (!Jsonrpc.isValidResponse(result)) {
-            return errors.InvalidResponse(result);
-          }
-
-          return requests[index].format ? requests[index].format(result.result) : result.result;
         });
-
-      resolve(response);
+      resolve(formattedResults);
     });
   });
 }
-
-export { executeAsync };
