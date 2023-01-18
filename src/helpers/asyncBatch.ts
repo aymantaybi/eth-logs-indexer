@@ -14,7 +14,6 @@ export function executeAsync(batch: any): any {
           return results[index] || {};
         })
         .forEach(function (result, index) {
-          formattedResults.push(requests[index].format ? requests[index].format(result.result) : result.result);
           if (requests[index].callback) {
             if (result && result.error) {
               return requests[index].callback(errors.ErrorResponse(result));
@@ -31,6 +30,10 @@ export function executeAsync(batch: any): any {
               requests[index].callback(err);
             }
           }
+          if (!Jsonrpc.isValidResponse(result)) {
+            return formattedResults.push(undefined);
+          }
+          formattedResults.push(requests[index].format ? requests[index].format(result.result) : result.result);
         });
       resolve(formattedResults);
     });
