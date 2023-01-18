@@ -403,7 +403,5 @@ const indexer = new Indexer({ host, load, save });
 (async () => {
   await mongoClient.connect();
   await indexer.initialize();
-  await indexer.setOptions({ maxBlocks: 100 });
-  //await indexer.setFilters(filters);
   await indexer.start();
 })();

@@ -222,7 +222,14 @@ class Indexer {
       batch.add(getTransaction.request(transactionHash));
     }
     const transactions: Transaction[] = await executeAsync(batch);
-    return transactions;
+    return transactions.some((transaction) => transaction?.hash === undefined)
+      ? [
+          ...transactions.filter((transaction) => transaction?.hash !== undefined),
+          ...(await this.getTransactionsFromHashes(
+            hashes.filter((hash) => !transactions.find((transaction) => transaction?.hash === hash)),
+          )),
+        ]
+      : transactions;
   }
 
   private async getBlocksFromNumbers(numbers: number[]) {
@@ -235,8 +242,10 @@ class Indexer {
     const blocks: BlockTransactionString[] = await executeAsync(batch);
     return blocks.some((block) => block?.number === undefined)
       ? [
-          ...blocks,
-          ...(await this.getBlocksFromNumbers(numbers.filter((_, index) => blocks[index]?.number === undefined))),
+          ...blocks.filter((block) => block?.number !== undefined),
+          ...(await this.getBlocksFromNumbers(
+            numbers.filter((number) => !blocks.find((block) => block?.number === number)),
+          )),
         ]
       : blocks;
   }
