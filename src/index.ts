@@ -233,7 +233,12 @@ class Indexer {
       batch.add(getBlock.request(blockNumber));
     }
     const blocks: BlockTransactionString[] = await executeAsync(batch);
-    return blocks;
+    return blocks.some((block) => block?.number === undefined)
+      ? [
+          ...blocks,
+          ...(await this.getBlocksFromNumbers(numbers.filter((_, index) => blocks[index]?.number === undefined))),
+        ]
+      : blocks;
   }
 
   async start(blockNumber?: number) {
