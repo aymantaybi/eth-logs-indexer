@@ -2,15 +2,18 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 import { AbiItem } from 'web3-utils';
 import { MongoClient } from 'mongodb';
-import Indexer from '../src';
+import { Indexer } from '../src';
 import { Filter } from '../src/interfaces';
 import { Log, Load, Options, Save } from '../src/interfaces';
 
 const { HTTP_PROVIDER_HOST, MONGODB_URI } = process.env;
 
-const host = HTTP_PROVIDER_HOST!;
+if (!HTTP_PROVIDER_HOST) throw Error('Missing HTTP_PROVIDER_HOST from .env file');
+if (!MONGODB_URI) throw Error('Missing MONGODB_URI from .env file');
 
-const mongoClient = new MongoClient(MONGODB_URI!);
+const host = HTTP_PROVIDER_HOST;
+
+const mongoClient = new MongoClient(MONGODB_URI);
 
 const indexerDatabase = mongoClient.db('eth-logs-indexer');
 
@@ -403,5 +406,5 @@ const indexer = new Indexer({ host, load, save });
 (async () => {
   await mongoClient.connect();
   await indexer.initialize();
-  await indexer.start();
+  //await indexer.start();
 })();

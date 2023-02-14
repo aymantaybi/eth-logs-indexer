@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-namespace */
 import { BaseLog, Log } from './Log';
 import { Filter, FormattedFilter } from './Filter';
 
@@ -29,4 +30,13 @@ export interface IndexerConstructor {
   load: Load;
   filters?: Filter[];
   options?: Partial<Options>;
+}
+
+export namespace EventsListenersArguments {
+  export interface processing {
+    startedAt: number;
+    endedAt?: number;
+    fromBlock: number;
+    toBlock: number;
+  }
 }

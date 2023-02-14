@@ -95,7 +95,7 @@ function logBlockObject(
 function waitForEvent(
   eventEmitter: EventEmitter,
   eventName: string,
-  options = { timeout: 0, condition: (args: any) => true },
+  options: { timeout?: number; condition?: (...args: any) => boolean },
 ) {
   return new Promise((resolve) => {
     const timeoutID = options.timeout
@@ -104,7 +104,7 @@ function waitForEvent(
         }, options.timeout)
       : 0;
     const listener = (data: unknown) => {
-      if (options.condition && !options.condition(data)) return;
+      if (options.condition && options.condition(data)) return;
       if (options.timeout) clearTimeout(timeoutID);
       resolve(data);
     };

@@ -1,13 +1,11 @@
-import Jsonrpc from 'web3-core-requestmanager/src/jsonrpc';
-
 import { errors } from 'web3-core-helpers';
+import Jsonrpc from 'web3-core-requestmanager/src/jsonrpc';
 
 export function executeAsync(batch: any): any {
   return new Promise((resolve) => {
     const requests = batch.requests;
     const sortResponses = batch._sortResponses.bind(batch);
     const formattedResults: unknown[] = [];
-    const unsuccessfulRequests: any[] = [];
     batch.requestManager.sendBatch(requests, async function (err, results) {
       results = sortResponses(results);
       requests
@@ -36,12 +34,8 @@ export function executeAsync(batch: any): any {
               requests[index].format ? requests[index].format(result.result) : result.result,
             );
           }
-          unsuccessfulRequests.push(requests[index]);
         });
-      const unsuccessfulRequestsNewResults = unsuccessfulRequests.length
-        ? await executeAsync({ ...batch, requests: unsuccessfulRequests })
-        : [];
-      resolve([...formattedResults, ...unsuccessfulRequestsNewResults]);
+      resolve(formattedResults);
     });
   });
 }
