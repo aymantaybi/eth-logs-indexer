@@ -162,7 +162,7 @@ export class Indexer extends EventEmitter {
   async stop({ timeout = 10000 }) {
     if (!this.onProcessing) return false;
     this.removeListener('processing', this.onProcessing);
-    const condition = (data: EventsListenersArguments.processing) => Boolean(data.endedAt);
+    const condition = (data: EventsListenersArguments.processing | undefined) => Boolean(data?.endedAt);
     await waitForEvent(this, 'processing', { timeout, condition });
     this.onProcessing = undefined;
     logger.info(`Indexer stopped !`);
