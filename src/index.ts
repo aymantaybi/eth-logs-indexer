@@ -72,11 +72,11 @@ export class Indexer extends EventEmitter {
   private async process(fromBlock: number, toBlock: number) {
     if (!this.filters.length) {
       logger.error('No initialized  filters !');
-      return this.stop();
+      return this.stop({});
     }
     if (!this.chainId) {
       logger.error(`Unknown chain id : ${this.chainId}`);
-      return this.stop();
+      return this.stop({});
     }
     const startedAt = Date.now();
     this.emit('processing', { startedAt, fromBlock, toBlock });
@@ -159,13 +159,11 @@ export class Indexer extends EventEmitter {
     return true;
   }
 
-  async stop() {
+  async stop({ timeout = 10000 }) {
     if (!this.onProcessing) return false;
     this.removeListener('processing', this.onProcessing);
-    await waitForEvent(this, 'processing', {
-      timeout: 10000,
-      condition: (data: EventsListenersArguments.processing) => Boolean(data.endedAt),
-    });
+    const condition = (data: EventsListenersArguments.processing) => Boolean(data.endedAt);
+    await waitForEvent(this, 'processing', { timeout, condition });
     this.onProcessing = undefined;
     logger.info(`Indexer stopped !`);
     return true;

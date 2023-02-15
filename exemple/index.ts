@@ -406,5 +406,8 @@ const indexer = new Indexer({ host, load, save });
 (async () => {
   await mongoClient.connect();
   await indexer.initialize();
+  setTimeout(async () => {
+    await indexer.stop({});
+  }, 10000);
   //await indexer.start();
 })();

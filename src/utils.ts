@@ -104,8 +104,11 @@ function waitForEvent(
         }, options.timeout)
       : 0;
     const listener = (data: unknown) => {
-      if (options.condition && options.condition(data)) return;
-      if (options.timeout) clearTimeout(timeoutID);
+      if (options.condition) {
+        if (!options.condition(data)) return;
+        resolve(data);
+      }
+      clearTimeout(timeoutID);
       resolve(data);
     };
     eventEmitter.once(eventName, listener);
