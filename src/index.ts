@@ -135,7 +135,7 @@ export class Indexer extends EventEmitter {
           a.logIndex - b.logIndex,
       );
       await this.save.logs(logs);
-      logger.info(`${logs.length} log saved`);
+      logger.info(`Saved logs: ${logs.length}`);
     }
     this.latestBlockNumber = toBlock;
     await this.save.blockNumber(this.latestBlockNumber);
@@ -179,7 +179,7 @@ export class Indexer extends EventEmitter {
     const chainId = this.chainId;
     const isRunning = this.isRunning();
     const blockNumber = this.latestBlockNumber;
-    const filters = this.filters.length || 0;
+    const filters = this.filters.length;
     const options = this.options;
     return { chainId, isRunning, blockNumber, filters, options };
   }
@@ -230,7 +230,7 @@ export class Indexer extends EventEmitter {
   private makeProcessingEventListener() {
     const listener = async (data: EventsListenersArguments.processing) => {
       if (!data.endedAt) return;
-      const { fromBlock, toBlock, ignoreDelay } = await this.nextProcessOptions();
+      const { fromBlock, toBlock, ignoreDelay, currentBlockNumber } = await this.nextProcessOptions();
       if (fromBlock > toBlock) {
         logger.info(`Waiting for higher block (fromBlock: ${fromBlock} > toBlock: ${toBlock})...`);
         await sleep(10000);
@@ -238,6 +238,12 @@ export class Indexer extends EventEmitter {
       }
       if (!ignoreDelay) {
         await sleep(this.options.delay);
+      } else {
+        logger.info(
+          `Maximum number of blocks exceeded (${
+            currentBlockNumber - fromBlock
+          } block), Processing timeout is ignored...`,
+        );
       }
       await this.process(fromBlock, toBlock);
     };
@@ -251,7 +257,7 @@ export class Indexer extends EventEmitter {
     const blocksDelta = currentBlockNumber - fromBlock;
     const ignoreDelay = blocksDelta > maxBlocks;
     const toBlock = blocksDelta > maxBlocks ? fromBlock + maxBlocks : currentBlockNumber;
-    return { fromBlock, toBlock, ignoreDelay };
+    return { fromBlock, toBlock, ignoreDelay, currentBlockNumber };
   }
 
   private async getTransactionsFromHashes(hashes: string[]) {
